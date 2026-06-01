@@ -1,0 +1,37 @@
+{
+  "Reconnaissance": {
+    "cve_id": "CVE-2001-0347",
+    "cvss_score": 7.5,
+    "description": "Information disclosure vulnerability in Microsoft Windows 2000 telnet service allows remote attackers to determine the existence of user accounts such as Guest, or log in to the server without specifying the domain name, via a malformed userid.",
+    "severity": "UNKNOWN",
+    "source": "cache"
+  },
+  "XSS Attack": {
+    "cve_id": "CVE-2002-1315",
+    "cvss_score": 6.8,
+    "description": "Cross-site scripting (XSS) vulnerability in the Admin Server for iPlanet WebServer 4.x, up to SP11, allows remote attackers to execute web script or HTML as the iPlanet administrator by injecting the desired script into error logs, and possibly escalating privileges by using the XSS vulnerability in conjunction with another issue (CVE-2002-1316).",
+    "severity": "UNKNOWN",
+    "source": "nvd_api"
+  },
+  "Command Injection": {
+    "cve_id": "CVE-2019-1010174",
+    "cvss_score": 9.8,
+    "description": "CImg The CImg Library v.2.3.3 and earlier is affected by: command injection. The impact is: RCE. The component is: load_network() function. The attack vector is: Loading an image from a user-controllable url can lead to command injection, because no string sanitization is done on the url. The fixed version is: v.2.3.4.",
+    "severity": "CRITICAL",
+    "source": "nvd_api"
+  },
+  "Directory Traversal": {
+    "cve_id": "CVE-1999-1177",
+    "cvss_score": 5.0,
+    "description": "Directory traversal vulnerability in nph-publish before 1.2 allows remote attackers to overwrite arbitrary files via a .. (dot dot) in the pathname for an upload operation.",
+    "severity": "UNKNOWN",
+    "source": "nvd_api"
+  },
+  "Brute Force": {
+    "cve_id": "CVE-2000-0808",
+    "cvss_score": 7.5,
+    "description": "The seed generation mechanism in the inter-module S/Key authentication mechanism in Check Point VPN-1/FireWall-1 4.1 and earlier allows remote attackers to bypass authentication via a brute force attack, aka \"One-time (s/key) Password Authentication.\"",
+    "severity": "UNKNOWN",
+    "source": "nvd_api"
+  }
+}

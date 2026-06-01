@@ -1,0 +1,302 @@
+[
+  {
+    "id": "ALT-0001",
+    "timestamp": "2026-05-17T06:52:52.995777+00:00",
+    "risk_score": 3.82,
+    "risk_label": "Medium",
+    "attack_type": "Reconnaissance",
+    "source_ip": "127.0.0.1",
+    "target_url": "/phpmyadmin",
+    "cve_id": "CVE-2001-0347",
+    "cvss_score": 7.5,
+    "status": "open",
+    "channel": [
+      "dashboard"
+    ]
+  },
+  {
+    "id": "ALT-0002",
+    "timestamp": "2026-05-17T06:53:20.520718+00:00",
+    "risk_score": 3.84,
+    "risk_label": "Medium",
+    "attack_type": "Reconnaissance",
+    "source_ip": "127.0.0.1",
+    "target_url": "/.env",
+    "cve_id": "CVE-2001-0347",
+    "cvss_score": 7.5,
+    "status": "open",
+    "channel": [
+      "dashboard"
+    ]
+  },
+  {
+    "id": "ALT-0003",
+    "timestamp": "2026-05-17T06:53:42.826166+00:00",
+    "risk_score": 3.85,
+    "risk_label": "Medium",
+    "attack_type": "Reconnaissance",
+    "source_ip": "127.0.0.1",
+    "target_url": "/robots.txt",
+    "cve_id": "CVE-2001-0347",
+    "cvss_score": 7.5,
+    "status": "open",
+    "channel": [
+      "dashboard"
+    ]
+  },
+  {
+    "id": "ALT-0004",
+    "timestamp": "2026-05-17T06:55:24.894608+00:00",
+    "risk_score": 3.91,
+    "risk_label": "Medium",
+    "attack_type": "Reconnaissance",
+    "source_ip": "127.0.0.1",
+    "target_url": "/robots.txt",
+    "cve_id": "CVE-2001-0347",
+    "cvss_score": 7.5,
+    "status": "open",
+    "channel": [
+      "dashboard"
+    ]
+  },
+  {
+    "id": "ALT-0005",
+    "timestamp": "2026-05-17T07:47:11.384290+00:00",
+    "risk_score": 3.84,
+    "risk_label": "Medium",
+    "attack_type": "Unauthorized Access",
+    "source_ip": "127.0.0.1",
+    "target_url": "/admin-login",
+    "cve_id": null,
+    "cvss_score": 3.0,
+    "status": "open",
+    "channel": [
+      "dashboard"
+    ]
+  },
+  {
+    "id": "ALT-0006",
+    "timestamp": "2026-05-17T07:47:45.807608+00:00",
+    "risk_score": 3.85,
+    "risk_label": "Medium",
+    "attack_type": "Unauthorized Access",
+    "source_ip": "127.0.0.1",
+    "target_url": "/admin-login",
+    "cve_id": null,
+    "cvss_score": 3.0,
+    "status": "open",
+    "channel": [
+      "dashboard"
+    ]
+  },
+  {
+    "id": "ALT-0007",
+    "timestamp": "2026-05-17T07:50:50.715549+00:00",
+    "risk_score": 5.48,
+    "risk_label": "Critical",
+    "attack_type": "XSS Attack",
+    "source_ip": "127.0.0.1",
+    "target_url": "/admin-login",
+    "cve_id": "CVE-2002-1315",
+    "cvss_score": 6.8,
+    "status": "open",
+    "channel": [
+      "dashboard"
+    ]
+  },
+  {
+    "id": "ALT-0008",
+    "timestamp": "2026-05-17T07:51:27.370635+00:00",
+    "risk_score": 6.7,
+    "risk_label": "Critical",
+    "attack_type": "Command Injection",
+    "source_ip": "127.0.0.1",
+    "target_url": "/api/v1/users",
+    "cve_id": "CVE-2019-1010174",
+    "cvss_score": 9.8,
+    "status": "open",
+    "channel": [
+      "dashboard"
+    ]
+  },
+  {
+    "id": "ALT-0009",
+    "timestamp": "2026-05-17T07:51:49.099103+00:00",
+    "risk_score": 5.79,
+    "risk_label": "Critical",
+    "attack_type": "Directory Traversal",
+    "source_ip": "127.0.0.1",
+    "target_url": "/api/v1/users",
+    "cve_id": "CVE-1999-1177",
+    "cvss_score": 7.5,
+    "status": "open",
+    "channel": [
+      "dashboard"
+    ]
+  },
+  {
+    "id": "ALT-0010",
+    "timestamp": "2026-05-17T07:52:25.710748+00:00",
+    "risk_score": 4.0,
+    "risk_label": "Medium",
+    "attack_type": "Unauthorized Access",
+    "source_ip": "127.0.0.1",
+    "target_url": "/admin-login",
+    "cve_id": null,
+    "cvss_score": 3.0,
+    "status": "open",
+    "channel": [
+      "dashboard"
+    ]
+  },
+  {
+    "id": "ALT-0011",
+    "timestamp": "2026-05-17T07:52:46.556163+00:00",
+    "risk_score": 4.0,
+    "risk_label": "Medium",
+    "attack_type": "Unauthorized Access",
+    "source_ip": "127.0.0.1",
+    "target_url": "/admin-login",
+    "cve_id": null,
+    "cvss_score": 3.0,
+    "status": "open",
+    "channel": [
+      "dashboard"
+    ]
+  },
+  {
+    "id": "ALT-0012",
+    "timestamp": "2026-05-17T07:52:46.573400+00:00",
+    "risk_score": 4.0,
+    "risk_label": "Medium",
+    "attack_type": "Unauthorized Access",
+    "source_ip": "127.0.0.1",
+    "target_url": "/admin-login",
+    "cve_id": null,
+    "cvss_score": 3.0,
+    "status": "open",
+    "channel": [
+      "dashboard"
+    ]
+  },
+  {
+    "id": "ALT-0013",
+    "timestamp": "2026-05-17T07:52:46.591180+00:00",
+    "risk_score": 4.0,
+    "risk_label": "Medium",
+    "attack_type": "Unauthorized Access",
+    "source_ip": "127.0.0.1",
+    "target_url": "/admin-login",
+    "cve_id": null,
+    "cvss_score": 3.0,
+    "status": "open",
+    "channel": [
+      "dashboard"
+    ]
+  },
+  {
+    "id": "ALT-0014",
+    "timestamp": "2026-05-17T07:52:47.832843+00:00",
+    "risk_score": 9.0,
+    "risk_label": "Critical",
+    "attack_type": "Brute Force",
+    "source_ip": "127.0.0.1",
+    "target_url": "/admin-login",
+    "cve_id": "CVE-2000-0808",
+    "cvss_score": 7.5,
+    "status": "open",
+    "channel": [
+      "dashboard"
+    ]
+  },
+  {
+    "id": "ALT-0015",
+    "timestamp": "2026-05-17T07:52:47.852291+00:00",
+    "risk_score": 9.0,
+    "risk_label": "Critical",
+    "attack_type": "Brute Force",
+    "source_ip": "127.0.0.1",
+    "target_url": "/admin-login",
+    "cve_id": "CVE-2000-0808",
+    "cvss_score": 7.5,
+    "status": "open",
+    "channel": [
+      "dashboard"
+    ]
+  },
+  {
+    "id": "ALT-0016",
+    "timestamp": "2026-05-17T07:52:47.866993+00:00",
+    "risk_score": 9.0,
+    "risk_label": "Critical",
+    "attack_type": "Brute Force",
+    "source_ip": "127.0.0.1",
+    "target_url": "/admin-login",
+    "cve_id": "CVE-2000-0808",
+    "cvss_score": 7.5,
+    "status": "open",
+    "channel": [
+      "dashboard"
+    ]
+  },
+  {
+    "id": "ALT-0017",
+    "timestamp": "2026-05-17T07:53:15.659081+00:00",
+    "risk_score": 4.0,
+    "risk_label": "Medium",
+    "attack_type": "Unauthorized Access",
+    "source_ip": "127.0.0.1",
+    "target_url": "/backup.zip",
+    "cve_id": null,
+    "cvss_score": 3.0,
+    "status": "open",
+    "channel": [
+      "dashboard"
+    ]
+  },
+  {
+    "id": "ALT-0018",
+    "timestamp": "2026-05-17T07:53:36.355513+00:00",
+    "risk_score": 5.8,
+    "risk_label": "Critical",
+    "attack_type": "Reconnaissance",
+    "source_ip": "127.0.0.1",
+    "target_url": "/.env",
+    "cve_id": "CVE-2001-0347",
+    "cvss_score": 7.5,
+    "status": "open",
+    "channel": [
+      "dashboard"
+    ]
+  },
+  {
+    "id": "ALT-0019",
+    "timestamp": "2026-05-17T07:53:36.371413+00:00",
+    "risk_score": 4.0,
+    "risk_label": "Medium",
+    "attack_type": "Unauthorized Access",
+    "source_ip": "127.0.0.1",
+    "target_url": "/backup.zip",
+    "cve_id": null,
+    "cvss_score": 3.0,
+    "status": "open",
+    "channel": [
+      "dashboard"
+    ]
+  },
+  {
+    "id": "ALT-0020",
+    "timestamp": "2026-05-17T07:53:36.390912+00:00",
+    "risk_score": 4.0,
+    "risk_label": "Medium",
+    "attack_type": "Unauthorized Access",
+    "source_ip": "127.0.0.1",
+    "target_url": "/internal-docs",
+    "cve_id": null,
+    "cvss_score": 3.0,
+    "status": "open",
+    "channel": [
+      "dashboard"
+    ]
+  }
+]
