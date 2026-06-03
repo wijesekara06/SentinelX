@@ -259,9 +259,9 @@ class RiskScorer:
         )
         score = round(min(score, 10.0), 2)
 
-        if score > 4.5:
+        if score > 6.5:
             label = "Critical"
-        elif score > 2.5:
+        elif score > 3.5:
             label = "Medium"
         else:
             label = "Low"
