@@ -287,7 +287,8 @@ function loadAll() {
 
 async function loadStats() {
   try {
-    const d = await (await fetch(`${HP}/api/stats`)).json();
+    const d = await (await fetch(`${BE}/api/stats`, {
+  headers: { 'Authorization': `Bearer ${tok}` }})).json();
     document.getElementById('s-total').textContent = d.total_events||0;
     document.getElementById('s-crit').textContent  = d.critical_count||0;
     document.getElementById('s-med').textContent   = d.medium_count||0;
@@ -320,7 +321,8 @@ function renderChart(bd) {
 
 async function loadLogs() {
   try {
-    const d    = await (await fetch(`${HP}/api/logs?limit=8`)).json();
+    const d = await (await fetch(`${BE}/api/logs?limit=8`, {
+  headers: { 'Authorization': `Bearer ${tok}` }})).json();
     const logs = d.logs||[];
     const feed = document.getElementById('feed');
     if (!logs.length) {
@@ -354,8 +356,8 @@ async function loadLogs() {
 
 async function loadAlerts() {
   try {
-    const d = await (await fetch(
-      `${HP}/api/logs?label=Critical&limit=6`)).json();
+    const d = await (await fetch(`${BE}/api/logs?label=Critical&limit=6`, {
+  headers: { 'Authorization': `Bearer ${tok}` }})).json();
     const logs  = d.logs||[];
     const panel = document.getElementById('alerts-panel');
     if (!logs.length) {
