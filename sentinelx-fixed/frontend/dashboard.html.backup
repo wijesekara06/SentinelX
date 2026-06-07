@@ -1,0 +1,406 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>SentinelX — Command Center</title>
+<style>
+@import url('https://fonts.googleapis.com/css2?family=Share+Tech+Mono&family=Rajdhani:wght@400;500;600;700&display=swap');
+* { box-sizing:border-box; margin:0; padding:0; }
+:root {
+  --bg:#0a0d14; --bg2:#0d1117; --bg3:#111722; --bg4:#161d2a;
+  --border:rgba(56,189,248,0.1); --border2:rgba(56,189,248,0.2);
+  --text:#cdd6f4; --muted:#6b7280; --accent:#38bdf8; --accent2:#0ea5e9;
+  --green:#00ff88; --red:#ff4757; --orange:#ff6b35; --yellow:#ffd32a;
+  --purple:#a78bfa; --teal:#2dd4bf;
+  --mono:'Share Tech Mono',monospace; --sans:'Rajdhani',sans-serif;
+}
+body { background:var(--bg); color:var(--text); font-family:var(--sans); font-size:14px; min-height:100vh; }
+#login-screen { position:fixed; inset:0; background:var(--bg); display:flex; align-items:center; justify-content:center; z-index:200; }
+.login-card { background:var(--bg2); border:1px solid var(--border2); border-radius:4px; padding:40px; width:400px; position:relative; }
+.login-card::before { content:''; position:absolute; top:0; left:0; right:0; height:2px; background:linear-gradient(90deg,transparent,var(--accent),transparent); }
+.login-logo { text-align:center; margin-bottom:28px; }
+.login-logo h1 { font-family:var(--mono); font-size:1.6rem; color:var(--accent); letter-spacing:.15em; }
+.login-logo p { font-size:.75rem; color:var(--muted); margin-top:6px; letter-spacing:.1em; text-transform:uppercase; }
+.login-warn { background:rgba(255,71,87,.08); border:1px solid rgba(255,71,87,.25); border-radius:3px; padding:10px 14px; font-size:.75rem; color:#ff8fa3; text-align:center; margin-bottom:24px; font-family:var(--mono); }
+.form-label { display:block; font-size:.7rem; color:var(--muted); margin-bottom:6px; text-transform:uppercase; letter-spacing:.1em; }
+.form-input { width:100%; padding:10px 14px; background:var(--bg3); border:1px solid var(--border2); border-radius:3px; color:var(--text); font-size:.9rem; font-family:var(--mono); margin-bottom:16px; outline:none; transition:.15s; }
+.form-input:focus { border-color:var(--accent); }
+.btn-auth { width:100%; padding:12px; background:var(--accent2); border:none; border-radius:3px; color:#fff; font-family:var(--sans); font-size:.95rem; font-weight:700; cursor:pointer; letter-spacing:.05em; text-transform:uppercase; transition:.15s; }
+.btn-auth:hover { background:var(--accent); }
+.login-error { color:var(--red); font-size:.8rem; text-align:center; margin-top:10px; font-family:var(--mono); }
+#app { display:none; min-height:100vh; }
+.topbar { background:var(--bg2); border-bottom:1px solid var(--border); padding:0 20px; height:52px; display:flex; align-items:center; justify-content:space-between; position:sticky; top:0; z-index:100; }
+.topbar-left { display:flex; align-items:center; gap:16px; }
+.topbar-logo { font-family:var(--mono); font-size:1rem; color:var(--accent); letter-spacing:.12em; display:flex; align-items:center; gap:8px; }
+.topbar-logo::before { content:'⬡'; font-size:1.1rem; }
+.topbar-tag { font-size:.65rem; font-family:var(--mono); color:var(--muted); border:1px solid var(--border); padding:2px 8px; border-radius:2px; letter-spacing:.08em; }
+.topbar-right { display:flex; align-items:center; gap:12px; }
+.badge-active { display:flex; align-items:center; gap:6px; font-size:.7rem; font-family:var(--mono); color:var(--green); background:rgba(0,255,136,.08); border:1px solid rgba(0,255,136,.2); padding:4px 10px; border-radius:2px; }
+.badge-active::before { content:''; width:6px; height:6px; background:var(--green); border-radius:50%; animation:blink 2s infinite; }
+@keyframes blink { 0%,100%{opacity:1} 50%{opacity:.3} }
+.topbar-user { font-size:.75rem; color:var(--muted); font-family:var(--mono); }
+.btn-logout { background:transparent; border:1px solid var(--border); color:var(--muted); padding:5px 12px; border-radius:2px; cursor:pointer; font-size:.75rem; font-family:var(--mono); transition:.15s; }
+.btn-logout:hover { color:var(--red); border-color:var(--red); }
+.main { padding:20px; max-width:1400px; margin:0 auto; }
+.status-bar { background:var(--bg2); border:1px solid var(--border); border-radius:4px; padding:10px 16px; display:flex; align-items:center; gap:24px; margin-bottom:14px; font-family:var(--mono); font-size:.72rem; flex-wrap:wrap; }
+.status-item { display:flex; align-items:center; gap:8px; color:var(--muted); }
+.status-item .ok { color:var(--green); }
+.stats-row { display:grid; grid-template-columns:repeat(4,1fr); gap:12px; margin-bottom:14px; }
+.stat-card { background:var(--bg2); border:1px solid var(--border); border-radius:4px; padding:16px 20px; position:relative; overflow:hidden; }
+.stat-card::after { content:''; position:absolute; bottom:0; left:0; right:0; height:2px; }
+.stat-card.c-blue::after { background:var(--accent); }
+.stat-card.c-green::after { background:var(--green); }
+.stat-card.c-red::after { background:var(--red); }
+.stat-card.c-orange::after { background:var(--orange); }
+.stat-card.c-yellow::after { background:var(--yellow); }
+.stat-card.c-purple::after { background:var(--purple); }
+.stat-label { font-size:.7rem; color:var(--muted); text-transform:uppercase; letter-spacing:.08em; margin-bottom:8px; font-family:var(--mono); }
+.stat-value { font-size:2.2rem; font-weight:700; font-family:var(--mono); line-height:1; }
+.sv-blue{color:var(--accent)} .sv-green{color:var(--green)} .sv-red{color:var(--red)}
+.sv-orange{color:var(--orange)} .sv-yellow{color:var(--yellow)} .sv-purple{color:var(--purple)}
+.stat-sub { font-size:.65rem; color:var(--muted); margin-top:6px; font-family:var(--mono); }
+.content-grid { display:grid; grid-template-columns:1fr 1fr; gap:12px; margin-bottom:12px; }
+.card { background:var(--bg2); border:1px solid var(--border); border-radius:4px; overflow:hidden; }
+.card-header { padding:12px 16px; border-bottom:1px solid var(--border); display:flex; align-items:center; justify-content:space-between; background:var(--bg3); }
+.card-title { font-size:.7rem; font-family:var(--mono); color:var(--accent); text-transform:uppercase; letter-spacing:.1em; display:flex; align-items:center; gap:8px; }
+.card-title::before { content:'//'; color:var(--muted); }
+.card-body { padding:16px; }
+.refresh-btn { background:transparent; border:1px solid var(--border); color:var(--muted); padding:3px 10px; border-radius:2px; cursor:pointer; font-size:.7rem; font-family:var(--mono); transition:.15s; }
+.refresh-btn:hover { color:var(--accent); border-color:var(--accent); }
+.bar-row { display:flex; align-items:center; gap:10px; margin-bottom:10px; }
+.bar-label { font-size:.72rem; color:var(--muted); font-family:var(--mono); width:155px; text-align:right; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+.bar-track { flex:1; background:var(--bg4); border-radius:2px; height:8px; border:1px solid var(--border); }
+.bar-fill { height:100%; border-radius:2px; background:var(--accent2); transition:width .5s ease; }
+.bf-red{background:var(--red)} .bf-orange{background:var(--orange)} .bf-yellow{background:var(--yellow)}
+.bf-green{background:var(--green)} .bf-purple{background:var(--purple)} .bf-teal{background:var(--teal)}
+.bar-count { font-size:.72rem; font-family:var(--mono); color:var(--text); width:24px; text-align:right; }
+.threat-item { display:flex; align-items:flex-start; gap:10px; padding:8px 0; border-bottom:1px solid var(--border); }
+.threat-item:last-child { border-bottom:none; }
+.threat-badge { padding:2px 8px; border-radius:2px; font-size:.65rem; font-family:var(--mono); font-weight:600; letter-spacing:.05em; min-width:68px; text-align:center; white-space:nowrap; margin-top:2px; }
+.badge-critical{background:rgba(255,71,87,.15);color:var(--red);border:1px solid rgba(255,71,87,.3)}
+.badge-medium{background:rgba(255,107,53,.15);color:var(--orange);border:1px solid rgba(255,107,53,.3)}
+.badge-low{background:rgba(56,189,248,.15);color:var(--accent);border:1px solid rgba(56,189,248,.3)}
+.threat-info { flex:1; min-width:0; }
+.threat-type { font-size:.82rem; font-weight:600; color:var(--text); }
+.threat-meta { font-size:.7rem; color:var(--muted); font-family:var(--mono); margin-top:2px; }
+.threat-ip { font-size:.7rem; font-family:var(--mono); color:var(--red); white-space:nowrap; }
+.trace-log { background:#050709; border-radius:3px; padding:12px; font-family:var(--mono); font-size:.72rem; height:200px; overflow-y:auto; border:1px solid var(--border); }
+.trace-line { padding:2px 0; border-bottom:1px solid rgba(255,255,255,.03); display:flex; gap:10px; align-items:baseline; }
+.t-time{color:var(--muted);white-space:nowrap} .t-ip{color:var(--accent);white-space:nowrap}
+.t-method{color:var(--green)} .t-url{color:var(--text);flex:1} .t-label{white-space:nowrap}
+.trace-log::-webkit-scrollbar{width:4px}
+.trace-log::-webkit-scrollbar-thumb{background:var(--border2);border-radius:2px}
+.rec-dot { display:flex; align-items:center; gap:6px; font-size:.65rem; font-family:var(--mono); color:var(--red); }
+.rec-dot::before { content:'●'; animation:blink 1s infinite; }
+.alert-item { padding:12px; border-radius:3px; margin-bottom:8px; background:var(--bg3); border:1px solid var(--border); }
+.alert-header { display:flex; align-items:center; justify-content:space-between; margin-bottom:6px; }
+.alert-body { font-size:.82rem; color:var(--text); margin-bottom:4px; font-weight:600; }
+.alert-meta { font-size:.72rem; color:var(--muted); font-family:var(--mono); }
+.empty-state { text-align:center; padding:30px; color:var(--muted); font-family:var(--mono); font-size:.8rem; }
+</style>
+</head>
+<body>
+
+<div id="login-screen">
+  <div class="login-card">
+    <div class="login-logo">
+      <h1>SENTINELX</h1>
+      <p>Command Center — Restricted Access Only</p>
+    </div>
+    <div class="login-warn">⚠ Unauthorized access is monitored and logged</div>
+    <label class="form-label">Badge ID / Email</label>
+    <input class="form-input" type="text" id="u" placeholder="admin" />
+    <label class="form-label">Security Key</label>
+    <input class="form-input" type="password" id="p" placeholder="••••••••••••" />
+    <button class="btn-auth" onclick="doLogin()">Authenticate</button>
+    <div class="login-error" id="login-err"></div>
+  </div>
+</div>
+
+<div id="app">
+  <div class="topbar">
+    <div class="topbar-left">
+      <div class="topbar-logo">SENTINELX</div>
+      <div class="topbar-tag">COMMAND CENTER</div>
+      <div class="topbar-tag" style="color:#a78bfa;border-color:rgba(167,139,250,0.4)">UI: GIMASHI GIMHARA</div>
+    </div>
+    <div class="topbar-right">
+      <div class="badge-active">SYSTEM ACTIVE</div>
+      <div class="topbar-user" id="uname"></div>
+      <button class="btn-logout" onclick="doLogout()">[ LOGOUT ]</button>
+    </div>
+  </div>
+  <div class="main">
+    <div class="status-bar">
+      <div class="status-item">HONEYPOT <span class="ok">● ACTIVE</span></div>
+      <div class="status-item">CVE ENGINE <span class="ok">● READY</span></div>
+      <div class="status-item">PATTERN DETECTOR <span class="ok">● RUNNING</span></div>
+      <div class="status-item">ALERT ENGINE <span class="ok">● ARMED</span></div>
+      <div class="status-item" style="margin-left:auto">LAST REFRESH <span id="last-ref" style="color:var(--text)">--:--:--</span></div>
+    </div>
+    <div class="stats-row">
+      <div class="stat-card c-blue">
+        <div class="stat-label">Total Threats Blocked</div>
+        <div class="stat-value sv-blue" id="s-total">0</div>
+        <div class="stat-sub">total events captured</div>
+      </div>
+      <div class="stat-card c-green">
+        <div class="stat-label">Active Honey Nodes</div>
+        <div class="stat-value sv-green">6</div>
+        <div class="stat-sub">decoy endpoints active</div>
+      </div>
+      <div class="stat-card c-green">
+        <div class="stat-label">System Status</div>
+        <div class="stat-value sv-green" style="font-size:1.3rem;margin-top:6px">SECURE</div>
+        <div class="stat-sub">no breach detected</div>
+      </div>
+      <div class="stat-card c-yellow">
+        <div class="stat-label">Uptime</div>
+        <div class="stat-value sv-yellow">99.9%</div>
+        <div class="stat-sub">availability target met</div>
+      </div>
+    </div>
+    <div class="stats-row">
+      <div class="stat-card c-red">
+        <div class="stat-label">Critical Alerts</div>
+        <div class="stat-value sv-red" id="s-crit">0</div>
+        <div class="stat-sub">risk score &gt; 4.5</div>
+      </div>
+      <div class="stat-card c-orange">
+        <div class="stat-label">Medium Alerts</div>
+        <div class="stat-value sv-orange" id="s-med">0</div>
+        <div class="stat-sub">risk score &gt; 2.5</div>
+      </div>
+      <div class="stat-card c-blue">
+        <div class="stat-label">Low Risk Events</div>
+        <div class="stat-value sv-blue" id="s-low">0</div>
+        <div class="stat-sub">risk score &le; 2.5</div>
+      </div>
+      <div class="stat-card c-purple">
+        <div class="stat-label">Attack Categories</div>
+        <div class="stat-value sv-purple" id="s-types">0</div>
+        <div class="stat-sub">distinct attack types</div>
+      </div>
+    </div>
+    <div class="content-grid">
+      <div class="card">
+        <div class="card-header">
+          <div class="card-title">Attack Vector Analysis</div>
+          <button class="refresh-btn" onclick="loadStats()">&#8635; Refresh</button>
+        </div>
+        <div class="card-body">
+          <div id="chart"><div class="empty-state">// awaiting attack data...</div></div>
+        </div>
+      </div>
+      <div class="card">
+        <div class="card-header">
+          <div class="card-title">Live Threat Feed</div>
+          <div style="display:flex;align-items:center;gap:10px">
+            <div class="rec-dot" id="rec-ind" style="display:none">RECORDING</div>
+            <button class="refresh-btn" onclick="loadLogs()">&#8635; Refresh</button>
+          </div>
+        </div>
+        <div class="card-body" style="padding:8px 16px">
+          <div id="feed"><div class="empty-state">// no threats detected yet...</div></div>
+        </div>
+      </div>
+    </div>
+    <div class="card" style="margin-bottom:12px">
+      <div class="card-header">
+        <div class="card-title">Active Alerts</div>
+        <button class="refresh-btn" onclick="loadAlerts()">&#8635; Refresh</button>
+      </div>
+      <div class="card-body">
+        <div id="alerts-panel"><div class="empty-state">// no critical alerts</div></div>
+      </div>
+    </div>
+    <div class="card">
+      <div class="card-header">
+        <div class="card-title">Live Session Trace Log</div>
+        <div class="rec-dot">RECORDING</div>
+      </div>
+      <div class="card-body" style="padding:10px 16px">
+        <div class="trace-log" id="trace">
+          <div style="color:var(--muted)">// SentinelX Trace Log initialized...</div>
+          <div style="color:var(--muted)">// Waiting for incoming connections...</div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+const HP  = 'http://127.0.0.1:5001';
+const BE  = 'http://127.0.0.1:5000';
+let   tok = null;
+const seen = new Set();
+
+const COLORS = {
+  'SQL Injection':'bf-red',
+  'Command Injection':'bf-red',
+  'XSS Attack':'bf-orange',
+  'Directory Traversal':'bf-yellow',
+  'Brute Force':'bf-purple',
+  'Reconnaissance':'bf-teal',
+};
+
+async function doLogin() {
+  const user = document.getElementById('u').value.trim();
+  const pass = document.getElementById('p').value;
+  const err  = document.getElementById('login-err');
+  err.textContent = '';
+  try {
+    const r = await fetch(`${BE}/api/auth/login`, {
+      method:'POST',
+      headers:{'Content-Type':'application/json'},
+      body:JSON.stringify({username:user,password:pass})
+    });
+    const d = await r.json();
+    if (!r.ok) { err.textContent = d.error||'Login failed'; return; }
+    tok = d.token;
+    document.getElementById('uname').textContent = `[ ${d.name.toUpperCase()} ]`;
+    document.getElementById('login-screen').style.display = 'none';
+    document.getElementById('app').style.display = 'block';
+    loadAll();
+    setInterval(loadAll, 8000);
+  } catch(e) {
+    err.textContent = 'Cannot connect. Run: python backend/app.py';
+  }
+}
+
+function doLogout() {
+  tok = null;
+  document.getElementById('login-screen').style.display = 'flex';
+  document.getElementById('app').style.display = 'none';
+}
+
+document.getElementById('p').addEventListener('keydown', e => {
+  if (e.key==='Enter') doLogin();
+});
+
+function loadAll() {
+  loadStats(); loadLogs(); loadAlerts();
+  document.getElementById('last-ref').textContent =
+    new Date().toTimeString().substring(0,8);
+}
+
+async function loadStats() {
+  try {
+    const d = await (await fetch(`${BE}/api/stats`, {
+  headers: { 'Authorization': `Bearer ${tok}` }})).json();
+    document.getElementById('s-total').textContent = d.total_events||0;
+    document.getElementById('s-crit').textContent  = d.critical_count||0;
+    document.getElementById('s-med').textContent   = d.medium_count||0;
+    document.getElementById('s-low').textContent   = d.low_count||0;
+    const bd = d.attack_breakdown||{};
+    document.getElementById('s-types').textContent =
+      Object.keys(bd).filter(k=>bd[k]>0).length;
+    renderChart(bd);
+  } catch(e) {}
+}
+
+function renderChart(bd) {
+  const div    = document.getElementById('chart');
+  const sorted = Object.entries(bd).sort((a,b)=>b[1]-a[1]);
+  const max    = Math.max(...Object.values(bd),1);
+  if (!sorted.length) {
+    div.innerHTML='<div class="empty-state">// no attack data yet...</div>';
+    return;
+  }
+  div.innerHTML = sorted.map(([name,count]) => `
+    <div class="bar-row">
+      <div class="bar-label">${name}</div>
+      <div class="bar-track">
+        <div class="bar-fill ${COLORS[name]||''}"
+             style="width:${(count/max*100).toFixed(1)}%"></div>
+      </div>
+      <div class="bar-count">${count}</div>
+    </div>`).join('');
+}
+
+async function loadLogs() {
+  try {
+    const d = await (await fetch(`${BE}/api/logs?limit=8`, {
+  headers: { 'Authorization': `Bearer ${tok}` }})).json();
+    const logs = d.logs||[];
+    const feed = document.getElementById('feed');
+    if (!logs.length) {
+      feed.innerHTML='<div class="empty-state">// no threats detected yet...</div>';
+      document.getElementById('rec-ind').style.display='none';
+      return;
+    }
+    document.getElementById('rec-ind').style.display='flex';
+    feed.innerHTML = logs.map(log => {
+      const label = log.risk_label||'Low';
+      const cls   = label==='Critical'?'badge-critical':
+                    label==='Medium'  ?'badge-medium':'badge-low';
+      const time  = (log.timestamp||'').substring(11,19);
+      addTrace(time,log.source_ip,log.http_method,log.target_url,label);
+      return `
+        <div class="threat-item">
+          <span class="threat-badge ${cls}">${label}</span>
+          <div class="threat-info">
+            <div class="threat-type">${log.attack_type||'Unknown'} — ${log.target_url||'/'}</div>
+            <div class="threat-meta">
+              ${time} &nbsp;|&nbsp; Score: ${log.risk_score||0}
+              &nbsp;|&nbsp; CVE: ${log.cve_id||'N/A'}
+              &nbsp;|&nbsp; CVSS: ${log.cvss_score||'N/A'}
+            </div>
+          </div>
+          <div class="threat-ip">${log.source_ip||'?'}</div>
+        </div>`;
+    }).join('');
+  } catch(e) {}
+}
+
+async function loadAlerts() {
+  try {
+    const d = await (await fetch(`${BE}/api/logs?label=Critical&limit=6`, {
+  headers: { 'Authorization': `Bearer ${tok}` }})).json();
+    const logs  = d.logs||[];
+    const panel = document.getElementById('alerts-panel');
+    if (!logs.length) {
+      panel.innerHTML='<div class="empty-state">// no critical alerts</div>';
+      return;
+    }
+    panel.innerHTML = logs.map(log => `
+      <div class="alert-item">
+        <div class="alert-header">
+          <span class="threat-badge badge-critical">CRITICAL</span>
+          <span style="font-family:var(--mono);font-size:.7rem;color:var(--muted)">
+            Score: ${log.risk_score||0} | CVSS: ${log.cvss_score||'N/A'}
+          </span>
+        </div>
+        <div class="alert-body">
+          ${log.attack_type||'?'} detected on ${log.target_url||'/'}
+        </div>
+        <div class="alert-meta">
+          IP: ${log.source_ip||'?'} | CVE: ${log.cve_id||'N/A'} |
+          ${(log.timestamp||'').substring(0,19)}
+        </div>
+      </div>`).join('');
+  } catch(e) {}
+}
+
+function addTrace(time,ip,method,url,label) {
+  const key = `${time}${ip}${url}`;
+  if (seen.has(key)) return;
+  seen.add(key);
+  const color = label==='Critical'?'var(--red)':
+                label==='Medium'  ?'var(--orange)':'var(--accent)';
+  const log  = document.getElementById('trace');
+  const line = document.createElement('div');
+  line.className = 'trace-line';
+  line.innerHTML = `
+    <span class="t-time">${time||'--:--:--'}</span>
+    <span class="t-ip">${ip||'?'}</span>
+    <span class="t-method">${method||'GET'}</span>
+    <span class="t-url">${url||'/'}</span>
+    <span class="t-label" style="color:${color}">[${label}]</span>`;
+  log.appendChild(line);
+  log.scrollTop = log.scrollHeight;
+}
+</script>
+</body>
+</html>

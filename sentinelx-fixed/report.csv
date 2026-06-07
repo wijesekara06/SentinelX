@@ -1,0 +1,42 @@
+timestamp,source_ip,http_method,target_url,attack_type,risk_score,risk_label,cve_id,cvss_score
+2026-06-05T07:28:33.788285+00:00,127.0.0.1,POST,/admin-login,SQL Injection,5.01,Medium,CVE-2000-1233,8.5
+2026-06-05T07:28:18.060571+00:00,127.0.0.1,POST,/admin-login,SQL Injection,4.2,Medium,CVE-2000-1233,8.5
+2026-06-05T07:27:02.586122+00:00,127.0.0.1,GET,/api/internal/tokens,Unauthorized Access,5.2,Medium,,3.0
+2026-06-05T07:27:02.429369+00:00,127.0.0.1,GET,/api/v2/users,Unauthorized Access,5.2,Medium,,3.0
+2026-06-05T07:27:02.272383+00:00,127.0.0.1,GET,/api/v1/admin/config,Unauthorized Access,5.2,Medium,,3.0
+2026-06-05T07:27:02.115922+00:00,127.0.0.1,GET,/api/v1/users,Unauthorized Access,5.2,Medium,,3.0
+2026-06-05T07:27:01.954890+00:00,127.0.0.1,GET,/api/v1/admin/config,Unauthorized Access,5.2,Medium,,3.0
+2026-06-05T07:27:01.796886+00:00,127.0.0.1,GET,/internal-docs,Unauthorized Access,5.2,Medium,,3.0
+2026-06-05T07:27:01.639507+00:00,127.0.0.1,GET,/db_backup.sql,Unauthorized Access,5.2,Medium,,3.0
+2026-06-05T07:27:01.483059+00:00,127.0.0.1,GET,/backup.zip,Unauthorized Access,5.2,Medium,,3.0
+2026-06-05T07:27:01.326500+00:00,127.0.0.1,GET,/.env,Reconnaissance,7.0,Critical,CVE-2001-0347,7.5
+2026-06-05T07:27:01.020739+00:00,127.0.0.1,POST,/api/v1/users,Command Injection,7.92,Critical,CVE-2019-1010174,9.8
+2026-06-05T07:27:01.015701+00:00,127.0.0.1,POST,/api/v1/users,Directory Traversal,7.0,Critical,CVE-1999-1177,7.5
+2026-06-05T07:27:01.010063+00:00,127.0.0.1,POST,/api/v1/users,Command Injection,7.92,Critical,CVE-2019-1010174,9.8
+2026-06-05T07:27:01.005576+00:00,127.0.0.1,POST,/api/v1/users,Command Injection,7.92,Critical,CVE-2019-1010174,9.8
+2026-06-05T07:27:00.850343+00:00,127.0.0.1,GET,/server-status,Unauthorized Access,5.2,Medium,,3.0
+2026-06-05T07:27:00.693310+00:00,127.0.0.1,GET,/phpmyadmin,Reconnaissance,7.0,Critical,CVE-2001-0347,7.5
+2026-06-05T07:27:00.536570+00:00,127.0.0.1,GET,/wp-admin,Reconnaissance,7.0,Critical,CVE-2001-0347,7.5
+2026-06-05T07:27:00.380742+00:00,127.0.0.1,GET,/sitemap.xml,Reconnaissance,7.0,Critical,CVE-2001-0347,7.5
+2026-06-05T07:27:00.212764+00:00,127.0.0.1,GET,/phpinfo.php,Unauthorized Access,5.2,Medium,,3.0
+2026-06-05T07:27:00.057581+00:00,127.0.0.1,GET,/.git/HEAD,Reconnaissance,7.0,Critical,CVE-2001-0347,7.5
+2026-06-05T07:26:59.902870+00:00,127.0.0.1,GET,/.git/config,Reconnaissance,7.0,Critical,CVE-2001-0347,7.5
+2026-06-05T07:26:59.746243+00:00,127.0.0.1,GET,/robots.txt,Reconnaissance,7.0,Critical,CVE-2001-0347,7.5
+2026-06-05T07:26:59.589241+00:00,127.0.0.1,POST,/admin-login,Brute Force,7.0,Critical,CVE-2000-0808,7.5
+2026-06-05T07:26:59.432610+00:00,127.0.0.1,POST,/admin-login,Brute Force,7.0,Critical,CVE-2000-0808,7.5
+2026-06-05T07:26:59.273987+00:00,127.0.0.1,POST,/admin-login,Brute Force,7.0,Critical,CVE-2000-0808,7.5
+2026-06-05T07:26:59.115202+00:00,127.0.0.1,POST,/admin-login,Brute Force,7.0,Critical,CVE-2000-0808,7.5
+2026-06-05T07:26:58.954586+00:00,127.0.0.1,POST,/admin-login,Brute Force,7.0,Critical,CVE-2000-0808,7.5
+2026-06-05T07:26:58.793289+00:00,127.0.0.1,POST,/admin-login,Brute Force,7.0,Critical,CVE-2000-0808,7.5
+2026-06-05T07:26:58.486961+00:00,127.0.0.1,GET,/windows/system32,Directory Traversal,7.0,Critical,CVE-1999-1177,7.5
+2026-06-05T07:26:58.483002+00:00,127.0.0.1,GET,/api/v1/users,Directory Traversal,7.0,Critical,CVE-1999-1177,7.5
+2026-06-05T07:26:58.479605+00:00,127.0.0.1,GET,/../../etc/shadow,Directory Traversal,7.0,Critical,CVE-1999-1177,7.5
+2026-06-05T07:26:58.475935+00:00,127.0.0.1,GET,/../../etc/passwd,Directory Traversal,7.0,Critical,CVE-1999-1177,7.5
+2026-06-05T07:26:58.169364+00:00,127.0.0.1,POST,/admin-login,XSS Attack,6.72,Critical,CVE-2002-1315,6.8
+2026-06-05T07:26:58.163960+00:00,127.0.0.1,POST,/admin-login,XSS Attack,6.72,Critical,CVE-2002-1315,6.8
+2026-06-05T07:26:58.158211+00:00,127.0.0.1,POST,/admin-login,XSS Attack,6.72,Critical,CVE-2002-1315,6.8
+2026-06-05T07:26:58.149279+00:00,127.0.0.1,POST,/admin-login,XSS Attack,6.72,Critical,CVE-2002-1315,6.8
+2026-06-05T07:26:57.840794+00:00,127.0.0.1,POST,/admin-login,SQL Injection,6.6,Critical,CVE-2000-1233,8.5
+2026-06-05T07:26:57.835517+00:00,127.0.0.1,POST,/admin-login,SQL Injection,5.8,Medium,CVE-2000-1233,8.5
+2026-06-05T07:26:57.829036+00:00,127.0.0.1,POST,/admin-login,SQL Injection,5.0,Medium,CVE-2000-1233,8.5
+2026-06-05T07:26:57.822975+00:00,127.0.0.1,POST,/admin-login,SQL Injection,4.2,Medium,CVE-2000-1233,8.5

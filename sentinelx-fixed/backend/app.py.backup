@@ -1,0 +1,370 @@
+"""
+SentinelX - Backend Intelligence API
+Developer : Janith Warawita (Alerts and QA)
+FR-07     : Web-Based Dashboard and Reporting
+FR-08     : Secure Authentication and Access Control
+
+FIX v2:
+  - require_auth() now applied to /api/logs, /api/stats, /api/alerts,
+    /api/alerts/summary, and /api/alerts/<id>/ack — all were previously
+    unauthenticated despite the dashboard requiring a login.
+  - JWT_SECRET loaded from environment variable JWT_SECRET with dev fallback.
+  - Password hashes loaded from env vars ADMIN_PASSWORD / ANALYST_PASSWORD
+    with dev-password fallbacks (prints a warning if defaults are used).
+  - Added /api/auth/me endpoint so the dashboard can validate a stored token.
+
+IMPROVEMENT:
+  - /api/logs and /api/stats accept an analyst role as well as admin, so a
+    read-only analyst account can use the dashboard without full admin rights.
+"""
+
+import os
+import json
+import hmac
+import hashlib
+import base64
+import time
+from functools import wraps
+from flask import Flask, request, jsonify, Response, send_from_directory
+from flask_cors import CORS
+
+# ── Secrets — load from env in production, fall back to dev defaults ──────────
+JWT_SECRET = os.getenv("JWT_SECRET", "sentinelx-dev-secret")
+JWT_EXPIRY = 8 * 3600
+
+_admin_pwd    = os.getenv("ADMIN_PASSWORD",   "SentinelX@2026")
+_analyst_pwd  = os.getenv("ANALYST_PASSWORD", "Analyst@2026")
+
+if JWT_SECRET == "sentinelx-dev-secret":
+    print("[WARNING] JWT_SECRET is using the default dev value. "
+          "Set the JWT_SECRET environment variable in production.")
+
+USERS = {
+    "admin": {
+        "password_hash": hashlib.sha256(_admin_pwd.encode()).hexdigest(),
+        "role":          "admin",
+        "name":          "System Administrator",
+    },
+    "analyst": {
+        "password_hash": hashlib.sha256(_analyst_pwd.encode()).hexdigest(),
+        "role":          "analyst",
+        "name":          "Security Analyst",
+    },
+}
+
+
+# ── JWT helpers ───────────────────────────────────────────────────────────────
+
+def _b64(data):
+    return base64.urlsafe_b64encode(data).rstrip(b"=").decode()
+
+def _b64d(s):
+    s += "=" * (-len(s) % 4)
+    return base64.urlsafe_b64decode(s)
+
+def create_token(username, role):
+    header  = _b64(json.dumps({"alg": "HS256", "typ": "JWT"}).encode())
+    payload = _b64(json.dumps({
+        "sub":  username,
+        "role": role,
+        "iat":  int(time.time()),
+        "exp":  int(time.time()) + JWT_EXPIRY,
+    }).encode())
+    sig_input = f"{header}.{payload}".encode()
+    sig = _b64(hmac.new(JWT_SECRET.encode(), sig_input, hashlib.sha256).digest())
+    return f"{header}.{payload}.{sig}"
+
+def verify_token(token):
+    try:
+        parts = token.split(".")
+        if len(parts) != 3:
+            return None
+        header, payload, sig = parts
+        expected_sig = _b64(
+            hmac.new(
+                JWT_SECRET.encode(),
+                f"{header}.{payload}".encode(),
+                hashlib.sha256
+            ).digest()
+        )
+        if not hmac.compare_digest(sig, expected_sig):
+            return None
+        data = json.loads(_b64d(payload))
+        if data.get("exp", 0) < int(time.time()):
+            return None
+        return data
+    except Exception:
+        return None
+
+def require_auth(roles=None):
+    """Decorator that enforces JWT authentication and optional role check."""
+    def decorator(f):
+        @wraps(f)
+        def wrapper(*args, **kwargs):
+            auth_header = request.headers.get("Authorization", "")
+            if not auth_header.startswith("Bearer "):
+                return jsonify({"error": "Missing token"}), 401
+            token  = auth_header[7:]
+            claims = verify_token(token)
+            if not claims:
+                return jsonify({"error": "Token invalid or expired"}), 401
+            if roles and claims.get("role") not in roles:
+                return jsonify({"error": "Insufficient permissions"}), 403
+            request.user = claims
+            return f(*args, **kwargs)
+        return wrapper
+    return decorator
+
+
+# ── File helpers ──────────────────────────────────────────────────────────────
+
+LOG_FILE    = os.path.join(
+    os.path.dirname(__file__), "../honeypot/honeypot_activity.log"
+)
+ALERTS_FILE = os.path.join(
+    os.path.dirname(__file__), "../honeypot/alerts.json"
+)
+
+def read_logs(limit=500, filters=None):
+    entries = []
+    try:
+        with open(LOG_FILE, "r") as f:
+            lines = f.readlines()
+        for i, line in enumerate(reversed(lines)):
+            if len(entries) >= limit:
+                break
+            line = line.strip()
+            if not line:
+                continue
+            try:
+                entry = json.loads(line)
+                entry["_id"] = str(len(lines) - i)
+                if filters:
+                    if filters.get("risk_label") and \
+                       entry.get("risk_label") != filters["risk_label"]:
+                        continue
+                    if filters.get("attack_type") and \
+                       entry.get("attack_type") != filters["attack_type"]:
+                        continue
+                entries.append(entry)
+            except json.JSONDecodeError:
+                pass
+    except FileNotFoundError:
+        pass
+    return entries
+
+def load_alerts():
+    if os.path.exists(ALERTS_FILE):
+        try:
+            with open(ALERTS_FILE, "r") as f:
+                return json.load(f)
+        except Exception:
+            pass
+    return []
+
+def save_alerts(alerts):
+    with open(ALERTS_FILE, "w") as f:
+        json.dump(alerts, f, indent=2, default=str)
+
+
+# ── App factory ───────────────────────────────────────────────────────────────
+
+def create_backend_app():
+    app = Flask(__name__)
+    CORS(app, resources={r"/api/*": {"origins": "http://localhost:5000"}})
+
+    # ── Dashboard (public) ────────────────────────────────────────────────────
+
+    @app.route("/")
+    @app.route("/dashboard")
+    def dashboard():
+        frontend = os.path.join(
+            os.path.dirname(os.path.abspath(__file__)),
+            "..", "frontend"
+        )
+        return send_from_directory(frontend, "dashboard.html")
+
+    # ── Auth ──────────────────────────────────────────────────────────────────
+
+    @app.route("/api/auth/login", methods=["POST"])
+    def login():
+        data     = request.get_json() or {}
+        username = data.get("username", "").strip()
+        password = data.get("password", "")
+        user     = USERS.get(username)
+        if not user:
+            return jsonify({"error": "Invalid credentials"}), 401
+        pwd_hash = hashlib.sha256(password.encode()).hexdigest()
+        if not hmac.compare_digest(pwd_hash, user["password_hash"]):
+            return jsonify({"error": "Invalid credentials"}), 401
+        token = create_token(username, user["role"])
+        return jsonify({
+            "token":      token,
+            "role":       user["role"],
+            "name":       user["name"],
+            "expires_in": JWT_EXPIRY,
+        })
+
+    @app.route("/api/auth/me", methods=["GET"])
+    @require_auth()
+    def me():
+        """Validate a stored token and return the current user info."""
+        return jsonify({
+            "username": request.user.get("sub"),
+            "role":     request.user.get("role"),
+        })
+
+    # ── Logs — requires auth (admin or analyst) ───────────────────────────────
+
+    @app.route("/api/logs", methods=["GET"])
+    @require_auth(roles=["admin", "analyst"])
+    def get_logs():
+        limit  = min(int(request.args.get("limit", 100)), 500)
+        label  = request.args.get("label")
+        attack = request.args.get("attack")
+        filters = {}
+        if label:  filters["risk_label"]  = label
+        if attack: filters["attack_type"] = attack
+        logs = read_logs(limit=limit, filters=filters)
+        return jsonify({"status": "ok", "count": len(logs), "logs": logs})
+
+    # ── Stats — requires auth ─────────────────────────────────────────────────
+
+    @app.route("/api/stats", methods=["GET"])
+    @require_auth(roles=["admin", "analyst"])
+    def get_stats():
+        from collections import defaultdict
+        all_logs         = read_logs(limit=10000)
+        attack_breakdown = defaultdict(int)
+        risk_breakdown   = defaultdict(int)
+        ip_counts        = defaultdict(int)
+        for log in all_logs:
+            attack_breakdown[log.get("attack_type", "Unknown")] += 1
+            risk_breakdown[log.get("risk_label", "Low")]        += 1
+            ip_counts[log.get("source_ip", "?")]                += 1
+        top_ips = dict(
+            sorted(ip_counts.items(), key=lambda x: x[1], reverse=True)[:10]
+        )
+        return jsonify({
+            "total_events":     len(all_logs),
+            "critical_count":   risk_breakdown.get("Critical", 0),
+            "medium_count":     risk_breakdown.get("Medium", 0),
+            "low_count":        risk_breakdown.get("Low", 0),
+            "attack_breakdown": dict(attack_breakdown),
+            "top_ips":          top_ips,
+        })
+
+    # ── Alerts — requires auth ────────────────────────────────────────────────
+
+    @app.route("/api/alerts", methods=["GET"])
+    @require_auth(roles=["admin", "analyst"])
+    def get_alerts():
+        status = request.args.get("status")
+        limit  = min(int(request.args.get("limit", 50)), 500)
+        alerts = load_alerts()
+        if status:
+            alerts = [a for a in alerts if a.get("status") == status]
+        alerts = list(reversed(alerts))[:limit]
+        return jsonify({"status": "ok", "count": len(alerts), "alerts": alerts})
+
+    @app.route("/api/alerts/<alert_id>/ack", methods=["POST"])
+    @require_auth(roles=["admin"])
+    def acknowledge_alert(alert_id):
+        alerts = load_alerts()
+        for alert in alerts:
+            if alert["id"] == alert_id:
+                alert["status"]   = "acknowledged"
+                alert["acked_at"] = time.strftime("%Y-%m-%dT%H:%M:%SZ")
+                save_alerts(alerts)
+                return jsonify({"status": "ok", "alert_id": alert_id})
+        return jsonify({"error": "Alert not found"}), 404
+
+    @app.route("/api/alerts/summary", methods=["GET"])
+    @require_auth(roles=["admin", "analyst"])
+    def alerts_summary():
+        alerts  = load_alerts()
+        summary = {"open": 0, "acknowledged": 0, "critical": 0, "medium": 0}
+        for a in alerts:
+            s = a.get("status", "open")
+            l = a.get("risk_label", "Low")
+            if s in summary: summary[s] += 1
+            if l == "Critical": summary["critical"] += 1
+            elif l == "Medium":  summary["medium"]   += 1
+        return jsonify({"status": "ok", "summary": summary})
+
+    # ── CSV export — admin only ───────────────────────────────────────────────
+
+    @app.route("/api/report/csv", methods=["GET"])
+    @require_auth(roles=["admin"])
+    def export_csv():
+        import csv, io
+        logs   = read_logs(limit=1000)
+        output = io.StringIO()
+        writer = csv.DictWriter(output, fieldnames=[
+            "timestamp", "source_ip", "http_method", "target_url",
+            "attack_type", "risk_score", "risk_label", "cve_id", "cvss_score"
+        ])
+        writer.writeheader()
+        for log in logs:
+            writer.writerow({
+                "timestamp":   log.get("timestamp", ""),
+                "source_ip":   log.get("source_ip", ""),
+                "http_method": log.get("http_method", ""),
+                "target_url":  log.get("target_url", ""),
+                "attack_type": log.get("attack_type", ""),
+                "risk_score":  log.get("risk_score", ""),
+                "risk_label":  log.get("risk_label", ""),
+                "cve_id":      log.get("cve_id", ""),
+                "cvss_score":  log.get("cvss_score", ""),
+            })
+        return Response(
+            output.getvalue(),
+            mimetype="text/csv",
+            headers={
+                "Content-Disposition": "attachment;filename=sentinelx_report.csv"
+            }
+        )
+
+    # ── Health (public) ───────────────────────────────────────────────────────
+
+    @app.route("/api/health", methods=["GET"])
+    def health():
+        return jsonify({
+            "status":    "backend_active",
+            "version":   "2.0.0",
+            "honeypot":  "http://localhost:5001",
+            "dashboard": "http://localhost:5000/dashboard",
+        })
+
+    return app
+
+
+if __name__ == "__main__":
+    import sys
+    sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+    app  = create_backend_app()
+    port = int(os.getenv("BACKEND_PORT", 5000))
+    print("""
+╔══════════════════════════════════════════════════════╗
+║            SentinelX — Team A  (v2.0)               ║
+╠══════════════════════════════════════════════════════╣
+║  Pawani Wijesekara   — Honeypot Engineer             ║
+║  Naveesha Pathirathna — CVE Analyst                  ║
+║  Janith Warawita     — Alerts and QA                 ║
+║  Gimashi Gimhara     — Frontend Developer            ║
+╠══════════════════════════════════════════════════════╣
+║  POST /api/auth/login   — get JWT token              ║
+║  GET  /api/auth/me      — validate token             ║
+║  GET  /api/logs         — attack log list   [auth]   ║
+║  GET  /api/stats        — aggregated stats  [auth]   ║
+║  GET  /api/alerts       — alert list        [auth]   ║
+║  GET  /api/report/csv   — export CSV        [admin]  ║
+╠══════════════════════════════════════════════════════╣
+║  Credentials:                                        ║
+║    admin   / SentinelX@2026  (or env ADMIN_PASSWORD) ║
+║    analyst / Analyst@2026    (or env ANALYST_PASSWORD)║
+╚══════════════════════════════════════════════════════╝
+""")
+    print(f"  Running on: http://localhost:{port}")
+    print(f"  Dashboard:  http://localhost:{port}/dashboard\n")
+    app.run(host="0.0.0.0", port=port, debug=False)
