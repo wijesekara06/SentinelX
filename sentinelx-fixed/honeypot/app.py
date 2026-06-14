@@ -7,7 +7,7 @@ from .endpoints import honeypot_bp, logger
 
 def create_honeypot_app():
     app = Flask(__name__)
-    CORS(app, resources={r"/api/*": {"origins": "http://localhost:5000"}})
+    CORS(app, resources={r"/api/*": {"origins": "*"}})
 
     app.register_blueprint(honeypot_bp)
 

@@ -1,11 +1,24 @@
 """
 SentinelX - Honeypot Decoy Endpoints
 Developer : Pawani Wijesekara (Honeypot Engineer)
-FR-01     : Honeypot Endpoint Simulation
+FR-01     : Honeypot Endpoint Simulation & Configuration
+FR-02     : Continuous Activity Logging
 
 FIX v2:
   - Removed unreachable dead-code block after first return in process_request()
   - Directory traversal curl note: use --path-as-is or encoded URLs
+
+FIX v3 (FR-01):
+  - process_request() now consults HoneypotConfigManager (UC-04):
+      * If the matching honeypot is disabled, the request is NOT
+        logged and the route returns a plain 404.
+      * If the matching honeypot's interaction_level is "passive",
+        the request IS logged (for FR-02 / pattern detection / risk
+        scoring) but the route returns a minimal response instead of
+        the full decoy page — avoiding tipping off automated scanners
+        while still capturing telemetry.
+  - Configurable routes now check process_request()'s return value
+    before rendering their decoy response.
 """
 
 from flask import Blueprint, request, jsonify, render_template_string, make_response
@@ -13,12 +26,14 @@ from .logger import ActivityLogger
 from .pattern_detector import PatternDetector, RiskScorer
 from .cve_correlator import CVECorrelator
 from .alert_generator import AlertGenerator
+from .config_manager import HoneypotConfigManager
 
-logger     = ActivityLogger()
-detector   = PatternDetector()
-scorer     = RiskScorer()
-correlator = CVECorrelator()
-alerter    = AlertGenerator()
+logger         = ActivityLogger()
+detector       = PatternDetector()
+scorer         = RiskScorer()
+correlator     = CVECorrelator()
+alerter        = AlertGenerator()
+config_manager = HoneypotConfigManager()
 
 honeypot_bp = Blueprint("honeypot", __name__)
 
@@ -26,14 +41,27 @@ honeypot_bp = Blueprint("honeypot", __name__)
 def process_request(is_login_fail=False):
     """
     Core request pipeline:
+      0. Resolve honeypot configuration for this path (FR-01)
       1. Collect payload from all sources (raw body, form fields, query string)
       2. Run pattern detection
       3. Correlate CVE
       4. Score risk
       5. Log and raise alert
+
+    Returns:
+      None -> matching honeypot is disabled; caller returns 404, no logging.
+      dict -> log entry with an extra "_interaction_level" key
+              ("active" or "passive").
     """
     ip         = request.remote_addr
     target_url = request.path
+
+    # ── FR-01: honeypot configuration check ────────────────────────────
+    hp_config = config_manager.find_config(target_url)
+    if hp_config is not None and not hp_config.get("enabled", True):
+        return None
+
+    # Read raw bytes first — must happen before form parsing touches the stream
 
     # Read raw bytes first — must happen before form parsing touches the stream
     raw_bytes   = request.get_data()
@@ -79,6 +107,11 @@ def process_request(is_login_fail=False):
 
     log_entry = logger.capture(request, extra)
     alerter.evaluate(log_entry)
+
+    # ── FR-01: attach interaction level for the calling route ──────────
+    log_entry["_interaction_level"] = (
+        hp_config.get("interaction_level", "active") if hp_config else "active"
+    )
     return log_entry
 
 
@@ -182,21 +215,32 @@ def admin_login():
     if request.method == "POST":
         is_fail = True
         error   = "Invalid credentials. Please try again."
-    process_request(is_login_fail=is_fail)
+    log_entry = process_request(is_login_fail=is_fail)
+    if log_entry is None:
+        return "", 404
+    if log_entry["_interaction_level"] == "passive":
+        return "", 200
     return render_template_string(ADMIN_LOGIN_HTML, error=error), 200
 
 
 @honeypot_bp.route("/phpmyadmin", methods=["GET", "POST"])
 @honeypot_bp.route("/phpmyadmin/index.php", methods=["GET", "POST"])
 def phpmyadmin():
-    process_request(is_login_fail=(request.method == "POST"))
+    log_entry = process_request(is_login_fail=(request.method == "POST"))
+    if log_entry is None:
+        return "", 404
+    if log_entry["_interaction_level"] == "passive":
+        return "", 200
     return render_template_string(PHPMYADMIN_HTML), 200
-
 
 @honeypot_bp.route("/wp-admin", methods=["GET", "POST"])
 @honeypot_bp.route("/wp-login.php", methods=["GET", "POST"])
 def wp_admin():
-    process_request(is_login_fail=(request.method == "POST"))
+    log_entry = process_request(is_login_fail=(request.method == "POST"))
+    if log_entry is None:
+        return "", 404
+    if log_entry["_interaction_level"] == "passive":
+        return "", 200
     return (
         "<html><head><title>WordPress Login</title></head>"
         "<body><form method='POST'>"
@@ -209,7 +253,11 @@ def wp_admin():
 
 @honeypot_bp.route("/.env", methods=["GET"])
 def env_file():
-    process_request()
+    log_entry = process_request()
+    if log_entry is None:
+        return "", 404
+    if log_entry["_interaction_level"] == "passive":
+        return "", 200
     response = make_response(ENV_CONTENT, 200)
     response.headers["Content-Type"] = "text/plain"
     return response
@@ -218,7 +266,11 @@ def env_file():
 @honeypot_bp.route("/backup.zip", methods=["GET"])
 @honeypot_bp.route("/db_backup.sql", methods=["GET"])
 def fake_backup():
-    process_request()
+    log_entry = process_request()
+    if log_entry is None:
+        return "", 404
+    if log_entry["_interaction_level"] == "passive":
+        return "", 200
     fake_zip = b"PK\x03\x04" + b"\x00" * 20 + b"FAKE_BACKUP_SENTINELX"
     response = make_response(fake_zip, 200)
     response.headers["Content-Type"] = "application/zip"
@@ -227,7 +279,11 @@ def fake_backup():
 
 @honeypot_bp.route("/api/v1/users", methods=["GET", "POST", "PUT", "DELETE"])
 def api_users():
-    process_request()
+    log_entry = process_request()
+    if log_entry is None:
+        return "", 404
+    if log_entry["_interaction_level"] == "passive":
+        return "", 200
     return jsonify({
         "status": "success",
         "data": [
@@ -240,7 +296,11 @@ def api_users():
 
 @honeypot_bp.route("/api/v1/admin/config", methods=["GET", "POST"])
 def api_admin_config():
-    process_request()
+    log_entry = process_request()
+    if log_entry is None:
+        return "", 404
+    if log_entry["_interaction_level"] == "passive":
+        return "", 200
     return jsonify({
         "environment": "production",
         "db_host":     "db.vertexglobal.internal",
@@ -252,7 +312,11 @@ def api_admin_config():
 @honeypot_bp.route("/internal-docs", methods=["GET"])
 @honeypot_bp.route("/internal-docs/<path:subpath>", methods=["GET"])
 def internal_docs(subpath=""):
-    process_request()
+    log_entry = process_request()
+    if log_entry is None:
+        return "", 404
+    if log_entry["_interaction_level"] == "passive":
+        return "", 200
     return (
         "<html><body>"
         "<h1>Internal Security Guidelines — Employee Only</h1>"
@@ -286,5 +350,21 @@ def index():
 
 @honeypot_bp.route("/<path:path>", methods=["GET", "POST", "PUT", "DELETE", "PATCH"])
 def catch_all(path):
-    process_request()
+    log_entry = process_request()
+    if log_entry is None:
+        return "", 404
+
+    # FR-01: honeypots created via the Configuration API may not have a
+    # dedicated Flask route. If this path matches a configured, enabled
+    # honeypot, serve a generic decoy instead of the default 404.
+    hp_config = config_manager.find_config(request.path)
+    if hp_config is not None:
+        if log_entry["_interaction_level"] == "passive":
+            return "", 200
+        return jsonify({
+            "status":  "ok",
+            "service": hp_config.get("service_type", "service"),
+            "message": "Service temporarily unavailable. Please try again later.",
+        }), 200
+
     return "", 404

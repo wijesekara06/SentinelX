@@ -1,0 +1,88 @@
+[
+  {
+    "id": "hp-admin-login",
+    "url": "/admin-login",
+    "aliases": [],
+    "service_type": "login_panel",
+    "interaction_level": "active",
+    "enabled": true,
+    "created_at": "2026-02-25T00:00:00+00:00",
+    "created_by": "system"
+  },
+  {
+    "id": "hp-phpmyadmin",
+    "url": "/phpmyadmin",
+    "aliases": [
+      "/phpmyadmin/index.php"
+    ],
+    "service_type": "phpmyadmin",
+    "interaction_level": "active",
+    "enabled": true,
+    "created_at": "2026-02-25T00:00:00+00:00",
+    "created_by": "system"
+  },
+  {
+    "id": "hp-wp-admin",
+    "url": "/wp-admin",
+    "aliases": [
+      "/wp-login.php"
+    ],
+    "service_type": "cms_login",
+    "interaction_level": "active",
+    "enabled": true,
+    "created_at": "2026-02-25T00:00:00+00:00",
+    "created_by": "system"
+  },
+  {
+    "id": "hp-env-file",
+    "url": "/.env",
+    "aliases": [],
+    "service_type": "config_file",
+    "interaction_level": "active",
+    "enabled": true,
+    "created_at": "2026-02-25T00:00:00+00:00",
+    "created_by": "system"
+  },
+  {
+    "id": "hp-backup",
+    "url": "/backup.zip",
+    "aliases": [
+      "/db_backup.sql"
+    ],
+    "service_type": "backup_file",
+    "interaction_level": "active",
+    "enabled": true,
+    "created_at": "2026-02-25T00:00:00+00:00",
+    "created_by": "system"
+  },
+  {
+    "id": "hp-api-users",
+    "url": "/api/v1/users",
+    "aliases": [],
+    "service_type": "api_endpoint",
+    "interaction_level": "active",
+    "enabled": true,
+    "created_at": "2026-02-25T00:00:00+00:00",
+    "created_by": "system"
+  },
+  {
+    "id": "hp-api-admin-config",
+    "url": "/api/v1/admin/config",
+    "aliases": [],
+    "service_type": "api_endpoint",
+    "interaction_level": "active",
+    "enabled": true,
+    "created_at": "2026-02-25T00:00:00+00:00",
+    "created_by": "system"
+  },
+  {
+    "id": "hp-internal-docs",
+    "url": "/internal-docs",
+    "aliases": [],
+    "service_type": "document_honeytrap",
+    "interaction_level": "active",
+    "enabled": true,
+    "created_at": "2026-02-25T00:00:00+00:00",
+    "created_by": "system"
+  }
+]

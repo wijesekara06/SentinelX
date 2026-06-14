@@ -33,5 +33,12 @@
     "description": "The seed generation mechanism in the inter-module S/Key authentication mechanism in Check Point VPN-1/FireWall-1 4.1 and earlier allows remote attackers to bypass authentication via a brute force attack, aka \"One-time (s/key) Password Authentication.\"",
     "severity": "UNKNOWN",
     "source": "nvd_api"
+  },
+  "SQL Injection": {
+    "cve_id": "CVE-2000-1233",
+    "cvss_score": 7.5,
+    "description": "SQL injection vulnerability in read.php3 and other scripts in Phorum 3.0.7 allows remote attackers to execute arbitrary SQL queries via the sSQL parameter.",
+    "severity": "UNKNOWN",
+    "source": "nvd_api"
   }
 }

@@ -98,6 +98,19 @@ body { background:var(--bg); color:var(--text); font-family:var(--sans); font-si
 .alert-body { font-size:.82rem; color:var(--text); margin-bottom:4px; font-weight:600; }
 .alert-meta { font-size:.72rem; color:var(--muted); font-family:var(--mono); }
 .empty-state { text-align:center; padding:30px; color:var(--muted); font-family:var(--mono); font-size:.8rem; }
+.hp-table { width:100%; border-collapse:collapse; font-size:.78rem; }
+.hp-table th { text-align:left; color:var(--muted); font-family:var(--mono); font-size:.65rem; text-transform:uppercase; letter-spacing:.08em; padding:6px 8px; border-bottom:1px solid var(--border); }
+.hp-table td { padding:8px; border-bottom:1px solid var(--border); vertical-align:middle; }
+.hp-table tr:last-child td { border-bottom:none; }
+.hp-url { font-family:var(--mono); color:var(--text); }
+.hp-pill { padding:2px 8px; border-radius:2px; font-size:.65rem; font-family:var(--mono); font-weight:600; border:1px solid; }
+.hp-enabled { color:var(--green); border-color:rgba(0,255,136,.3); background:rgba(0,255,136,.08); }
+.hp-disabled { color:var(--red); border-color:rgba(255,71,87,.3); background:rgba(255,71,87,.08); }
+.hp-level { color:var(--muted); font-family:var(--mono); font-size:.7rem; text-transform:uppercase; }
+.hp-actions { display:flex; gap:6px; }
+.hp-btn { background:transparent; border:1px solid var(--border); color:var(--muted); padding:4px 10px; border-radius:2px; cursor:pointer; font-size:.7rem; font-family:var(--mono); transition:.15s; }
+.hp-btn:hover { color:var(--accent); border-color:var(--accent); }
+.hp-btn.danger:hover { color:var(--red); border-color:var(--red); }
 </style>
 </head>
 <body>
@@ -215,6 +228,32 @@ body { background:var(--bg); color:var(--text); font-family:var(--sans); font-si
         <div id="alerts-panel"><div class="empty-state">// no critical alerts</div></div>
       </div>
     </div>
+    <div class="card" style="margin-bottom:12px">
+      <div class="card-header">
+        <div class="card-title">Honeypot Configuration</div>
+        <div style="display:flex;align-items:center;gap:10px">
+          <button class="refresh-btn" onclick="toggleHpForm()">+ Add Honeypot</button>
+          <button class="refresh-btn" onclick="loadHoneypots()">&#8635; Refresh</button>
+        </div>
+      </div>
+      <div class="card-body">
+        <div id="hp-form" style="display:none;margin-bottom:14px;padding:12px;background:var(--bg3);border:1px solid var(--border);border-radius:3px">
+          <label class="form-label">Endpoint URL</label>
+          <input class="form-input" type="text" id="hp-url" placeholder="/fake-endpoint" />
+          <label class="form-label">Service Type</label>
+          <input class="form-input" type="text" id="hp-service" placeholder="login_panel, api_endpoint, etc." />
+          <label class="form-label">Interaction Level</label>
+          <select class="form-input" id="hp-level">
+            <option value="active">active — log + return full decoy response</option>
+            <option value="passive">passive — log only, minimal response</option>
+          </select>
+          <div id="hp-form-err" class="login-error" style="margin-bottom:10px"></div>
+          <button class="btn-auth" style="width:auto;padding:8px 20px" onclick="createHoneypot()">Deploy Honeypot</button>
+        </div>
+        <div id="hp-list"><div class="empty-state">// loading honeypot configuration...</div></div>
+      </div>
+    </div>
+    </div>
     <div class="card">
       <div class="card-header">
         <div class="card-title">Live Session Trace Log</div>
@@ -231,8 +270,10 @@ body { background:var(--bg); color:var(--text); font-family:var(--sans); font-si
 </div>
 
 <script>
-const HP  = 'http://127.0.0.1:5001';
-const BE  = 'http://127.0.0.1:5000';
+// Auto-detect server address from browser location
+const SERVER_HOST = window.location.hostname;
+const HP  = `http://${SERVER_HOST}:5001`;
+const BE  = `http://${SERVER_HOST}:5000`;
 let   tok = null;
 const seen = new Set();
 
@@ -280,7 +321,7 @@ document.getElementById('p').addEventListener('keydown', e => {
 });
 
 function loadAll() {
-  loadStats(); loadLogs(); loadAlerts();
+  loadStats(); loadLogs(); loadAlerts(); loadHoneypots();
   document.getElementById('last-ref').textContent =
     new Date().toTimeString().substring(0,8);
 }
@@ -383,23 +424,122 @@ async function loadAlerts() {
   } catch(e) {}
 }
 
-function addTrace(time,ip,method,url,label) {
-  const key = `${time}${ip}${url}`;
-  if (seen.has(key)) return;
-  seen.add(key);
-  const color = label==='Critical'?'var(--red)':
-                label==='Medium'  ?'var(--orange)':'var(--accent)';
-  const log  = document.getElementById('trace');
-  const line = document.createElement('div');
-  line.className = 'trace-line';
-  line.innerHTML = `
-    <span class="t-time">${time||'--:--:--'}</span>
-    <span class="t-ip">${ip||'?'}</span>
-    <span class="t-method">${method||'GET'}</span>
-    <span class="t-url">${url||'/'}</span>
-    <span class="t-label" style="color:${color}">[${label}]</span>`;
-  log.appendChild(line);
-  log.scrollTop = log.scrollHeight;
+// ── FR-01: Honeypot Configuration (UC-04) ──────────────────────────────────
+
+function toggleHpForm() {
+  const form = document.getElementById('hp-form');
+  form.style.display = form.style.display === 'none' ? 'block' : 'none';
+  document.getElementById('hp-form-err').textContent = '';
+}
+
+async function loadHoneypots() {
+  try {
+    const r = await fetch(`${BE}/api/honeypots`, {
+      headers: { 'Authorization': `Bearer ${tok}` }
+    });
+    const d = await r.json();
+    const honeypots = d.honeypots || [];
+    const list = document.getElementById('hp-list');
+
+    if (!honeypots.length) {
+      list.innerHTML = '<div class="empty-state">// no honeypots configured</div>';
+      return;
+    }
+
+    list.innerHTML = `
+      <table class="hp-table">
+        <thead>
+          <tr>
+            <th>Endpoint</th>
+            <th>Service Type</th>
+            <th>Interaction</th>
+            <th>Status</th>
+            <th>Actions</th>
+          </tr>
+        </thead>
+        <tbody>
+          ${honeypots.map(hp => `
+            <tr>
+              <td class="hp-url">${hp.url}</td>
+              <td>${hp.service_type}</td>
+              <td class="hp-level">${hp.interaction_level}</td>
+              <td>
+                <span class="hp-pill ${hp.enabled ? 'hp-enabled' : 'hp-disabled'}">
+                  ${hp.enabled ? 'ENABLED' : 'DISABLED'}
+                </span>
+              </td>
+              <td>
+                <div class="hp-actions">
+                  <button class="hp-btn" onclick="toggleHoneypot('${hp.id}')">
+                    ${hp.enabled ? 'Disable' : 'Enable'}
+                  </button>
+                  <button class="hp-btn danger" onclick="deleteHoneypot('${hp.id}','${hp.url}')">Delete</button>
+                </div>
+              </td>
+            </tr>`).join('')}
+        </tbody>
+      </table>`;
+  } catch(e) {}
+}
+
+async function createHoneypot() {
+  const url   = document.getElementById('hp-url').value.trim();
+  const svc   = document.getElementById('hp-service').value.trim();
+  const level = document.getElementById('hp-level').value;
+  const err   = document.getElementById('hp-form-err');
+  err.textContent = '';
+
+  if (!url || !svc) {
+    err.textContent = 'Endpoint URL and Service Type are required.';
+    return;
+  }
+  if (!url.startsWith('/')) {
+    err.textContent = "Endpoint URL must start with '/'.";
+    return;
+  }
+
+  try {
+    const r = await fetch(`${BE}/api/honeypots`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${tok}`
+      },
+      body: JSON.stringify({ url, service_type: svc, interaction_level: level })
+    });
+    const d = await r.json();
+    if (!r.ok) {
+      err.textContent = d.error || 'Failed to create honeypot.';
+      return;
+    }
+    document.getElementById('hp-url').value = '';
+    document.getElementById('hp-service').value = '';
+    toggleHpForm();
+    loadHoneypots();
+  } catch(e) {
+    err.textContent = 'Cannot connect to backend.';
+  }
+}
+
+async function toggleHoneypot(id) {
+  try {
+    await fetch(`${BE}/api/honeypots/${id}/toggle`, {
+      method: 'POST',
+      headers: { 'Authorization': `Bearer ${tok}` }
+    });
+    loadHoneypots();
+  } catch(e) {}
+}
+
+async function deleteHoneypot(id, url) {
+  if (!confirm(`Delete honeypot ${url}? This cannot be undone.`)) return;
+  try {
+    await fetch(`${BE}/api/honeypots/${id}`, {
+      method: 'DELETE',
+      headers: { 'Authorization': `Bearer ${tok}` }
+    });
+    loadHoneypots();
+  } catch(e) {}
 }
 </script>
 </body>

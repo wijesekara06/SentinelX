@@ -17,7 +17,7 @@ IMPROVEMENT:
   - /api/logs and /api/stats accept an analyst role as well as admin, so a
     read-only analyst account can use the dashboard without full admin rights.
 """
-
+import sys
 import os
 import json
 import hmac
@@ -27,6 +27,11 @@ import time
 from functools import wraps
 from flask import Flask, request, jsonify, Response, send_from_directory
 from flask_cors import CORS
+
+sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
+from honeypot.config_manager import HoneypotConfigManager, VALID_INTERACTION_LEVELS
+
+config_manager = HoneypotConfigManager()
 
 # ── Secrets — load from env in production, fall back to dev defaults ──────────
 JWT_SECRET = os.getenv("JWT_SECRET", "sentinelx-dev-secret")
@@ -171,7 +176,13 @@ def save_alerts(alerts):
 
 def create_backend_app():
     app = Flask(__name__)
-    CORS(app, resources={r"/api/*": {"origins": "http://localhost:5000"}})
+    CORS(app, resources={
+        r"/api/*": {
+            "origins": "*",
+            "methods": ["GET", "POST", "OPTIONS"],
+            "allow_headers": ["Content-Type", "Authorization"]
+        }
+    })
 
     # ── Dashboard (public) ────────────────────────────────────────────────────
 
@@ -292,6 +303,91 @@ def create_backend_app():
             elif l == "Medium":  summary["medium"]   += 1
         return jsonify({"status": "ok", "summary": summary})
 
+# ── Honeypot Configuration (FR-01 / UC-04) — admin manages, ──────────────
+    #    analysts get read-only visibility ────────────────────────────────────
+
+    @app.route("/api/honeypots", methods=["GET"])
+    @require_auth(roles=["admin", "analyst"])
+    def list_honeypots():
+        return jsonify({
+            "status":    "ok",
+            "honeypots": config_manager.get_all(),
+        })
+
+    @app.route("/api/honeypots", methods=["POST"])
+    @require_auth(roles=["admin"])
+    def create_honeypot():
+        data              = request.get_json() or {}
+        url               = (data.get("url") or "").strip()
+        service_type      = (data.get("service_type") or "").strip()
+        interaction_level = (data.get("interaction_level") or "active").strip()
+
+        if not url or not service_type:
+            return jsonify({"error": "url and service_type are required"}), 400
+        if not url.startswith("/"):
+            return jsonify({"error": "url must start with '/'"}), 400
+        if interaction_level not in VALID_INTERACTION_LEVELS:
+            return jsonify({"error": "interaction_level must be 'passive' or 'active'"}), 400
+
+        try:
+            hp = config_manager.create(
+                url, service_type, interaction_level,
+                actor=request.user.get("sub"),
+            )
+        except ValueError as e:
+            return jsonify({"error": str(e)}), 409
+
+        return jsonify({"status": "ok", "honeypot": hp}), 201
+
+    @app.route("/api/honeypots/<hp_id>", methods=["PUT"])
+    @require_auth(roles=["admin"])
+    def update_honeypot(hp_id):
+        data    = request.get_json() or {}
+        allowed = {}
+        for key in ("url", "service_type", "interaction_level", "enabled"):
+            if key in data:
+                allowed[key] = data[key]
+
+        if "url" in allowed and not str(allowed["url"]).startswith("/"):
+            return jsonify({"error": "url must start with '/'"}), 400
+        if "interaction_level" in allowed and \
+                allowed["interaction_level"] not in VALID_INTERACTION_LEVELS:
+            return jsonify({"error": "interaction_level must be 'passive' or 'active'"}), 400
+
+        try:
+            hp = config_manager.update(hp_id, actor=request.user.get("sub"), **allowed)
+        except ValueError as e:
+            return jsonify({"error": str(e)}), 409
+
+        if hp is None:
+            return jsonify({"error": "Honeypot not found"}), 404
+        return jsonify({"status": "ok", "honeypot": hp})
+
+    @app.route("/api/honeypots/<hp_id>", methods=["DELETE"])
+    @require_auth(roles=["admin"])
+    def delete_honeypot(hp_id):
+        ok = config_manager.delete(hp_id, actor=request.user.get("sub"))
+        if not ok:
+            return jsonify({"error": "Honeypot not found"}), 404
+        return jsonify({"status": "ok", "deleted": hp_id})
+
+    @app.route("/api/honeypots/<hp_id>/toggle", methods=["POST"])
+    @require_auth(roles=["admin"])
+    def toggle_honeypot(hp_id):
+        hp = config_manager.toggle(hp_id, actor=request.user.get("sub"))
+        if hp is None:
+            return jsonify({"error": "Honeypot not found"}), 404
+        return jsonify({"status": "ok", "honeypot": hp})
+
+    @app.route("/api/honeypots/audit", methods=["GET"])
+    @require_auth(roles=["admin"])
+    def honeypot_audit_log():
+        limit = min(int(request.args.get("limit", 50)), 500)
+        return jsonify({
+            "status": "ok",
+            "audit":  config_manager.get_audit_log(limit=limit),
+        })
+
     # ── CSV export — admin only ───────────────────────────────────────────────
 
     @app.route("/api/report/csv", methods=["GET"])
@@ -358,6 +454,13 @@ if __name__ == "__main__":
 ║  GET  /api/logs         — attack log list   [auth]   ║
 ║  GET  /api/stats        — aggregated stats  [auth]   ║
 ║  GET  /api/alerts       — alert list        [auth]   ║
+║  GET  /api/alerts       — alert list        [auth]   ║
+║  GET  /api/honeypots    — list honeypots    [auth]   ║
+║  POST /api/honeypots    — create honeypot   [admin]  ║
+║  PUT  /api/honeypots/<id>      — update     [admin]  ║
+║  DEL  /api/honeypots/<id>      — delete     [admin]  ║
+║  POST /api/honeypots/<id>/toggle — enable/disable [admin] ║
+║  GET  /api/honeypots/audit     — config audit log [admin] ║
 ║  GET  /api/report/csv   — export CSV        [admin]  ║
 ╠══════════════════════════════════════════════════════╣
 ║  Credentials:                                        ║
