@@ -214,11 +214,10 @@ def admin_login():
     error   = None
     if request.method == "POST":
         is_fail = True
-	error   = "Invalid credentials. Please try again."
+        error = "Invalid credentials. Please try again."
     else:
         # GET = fresh page load, treat as a "successful" session start
         detector.brute_tracker.reset(request.remote_addr)
-       	 
     log_entry = process_request(is_login_fail=is_fail)
     if log_entry is None:
         return "", 404
