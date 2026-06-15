@@ -16,7 +16,7 @@ import json
 import uuid
 from datetime import datetime, timezone
 
-ALERT_THRESHOLD = 2.5   # fire alert for anything labeled Medium or Critical
+ALERT_THRESHOLD = 3.5   # fire alert for anything labeled Medium or Critical
 ALERTS_FILE     = os.path.join(os.path.dirname(__file__), "alerts.json")
 
 

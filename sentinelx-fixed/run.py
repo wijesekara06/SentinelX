@@ -50,4 +50,4 @@ if __name__ == "__main__":
     print(f"  Logs API   : http://localhost:{port}/api/logs")
     print(f"  Stats API  : http://localhost:{port}/api/stats\n")
 
-    app.run(host="127.0.0.1", port=port, debug=False)
+    app.run(host="0.0.0.0", port=port, debug=False)

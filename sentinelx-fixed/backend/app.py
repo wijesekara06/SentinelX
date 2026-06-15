@@ -303,7 +303,7 @@ def create_backend_app():
             elif l == "Medium":  summary["medium"]   += 1
         return jsonify({"status": "ok", "summary": summary})
 
-# ── Honeypot Configuration (FR-01 / UC-04) — admin manages, ──────────────
+    # ── Honeypot Configuration (FR-01 / UC-04) — admin manages, ──────────────
     #    analysts get read-only visibility ────────────────────────────────────
 
     @app.route("/api/honeypots", methods=["GET"])

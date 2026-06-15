@@ -61,7 +61,7 @@ def process_request(is_login_fail=False):
     if hp_config is not None and not hp_config.get("enabled", True):
         return None
 
-    # Read raw bytes first — must happen before form parsing touches the stream
+    
 
     # Read raw bytes first — must happen before form parsing touches the stream
     raw_bytes   = request.get_data()
@@ -214,7 +214,11 @@ def admin_login():
     error   = None
     if request.method == "POST":
         is_fail = True
-        error   = "Invalid credentials. Please try again."
+	error   = "Invalid credentials. Please try again."
+    else:
+        # GET = fresh page load, treat as a "successful" session start
+        detector.brute_tracker.reset(request.remote_addr)
+       	 
     log_entry = process_request(is_login_fail=is_fail)
     if log_entry is None:
         return "", 404
@@ -327,7 +331,9 @@ def internal_docs(subpath=""):
 
 @honeypot_bp.route("/robots.txt", methods=["GET"])
 def robots():
-    process_request()
+    log_entry = process_request()
+    if log_entry is None:    # honeypot is disabled → honour it
+        return "", 404
     return (
         "User-agent: *\n"
         "Disallow: /admin/\n"
@@ -339,7 +345,9 @@ def robots():
 
 @honeypot_bp.route("/", methods=["GET"])
 def index():
-    process_request()
+    log_entry = process_request()
+    if log_entry is None:
+        return "", 404
     return (
         "<html><head><title>Vertex Global Networks</title></head>"
         "<body><h1>Vertex Global Networks</h1>"

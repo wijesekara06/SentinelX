@@ -1,6 +1,6 @@
 import os
 
-BASE = "os.path.dirname(os.path.abspath(__file__))"
+BASE = os.path.dirname(os.path.abspath(__file__))
 	
 print("Updating all team files...")
 
