@@ -455,7 +455,7 @@ if __name__ == "__main__":
 ║  GET  /api/logs         — attack log list   [auth]   ║
 ║  GET  /api/stats        — aggregated stats  [auth]   ║
 ║  GET  /api/alerts       — alert list        [auth]   ║
-║  GET  /api/alerts/summary       — alert summary        [auth]   ║
+║  GET  /api/alerts/summary — alert summary   [auth]   ║
 ║  GET  /api/honeypots    — list honeypots    [auth]   ║
 ║  POST /api/honeypots    — create honeypot   [admin]  ║
 ║  PUT  /api/honeypots/<id>      — update     [admin]  ║
