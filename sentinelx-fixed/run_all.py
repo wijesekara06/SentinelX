@@ -44,8 +44,8 @@ if __name__ == "__main__":
   http://localhost:5000/dashboard
 
   Login:
-    Username: admin
-    Password: SentinelX@2026
+    Login with your configured credentials.
+  
   ─────────────────────────────────────────
   Press Ctrl+C to stop all services.
     """)

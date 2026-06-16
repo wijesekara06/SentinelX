@@ -27,6 +27,7 @@ import time
 from functools import wraps
 from flask import Flask, request, jsonify, Response, send_from_directory
 from flask_cors import CORS
+from werkzeug.security import generate_password_hash, check_password_hash
 
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
 from honeypot.config_manager import HoneypotConfigManager, VALID_INTERACTION_LEVELS
@@ -46,12 +47,12 @@ if JWT_SECRET == "sentinelx-dev-secret":
 
 USERS = {
     "admin": {
-        "password_hash": hashlib.sha256(_admin_pwd.encode()).hexdigest(),
+        "password_hash": generate_password_hash(_admin_pwd),
         "role":          "admin",
         "name":          "System Administrator",
     },
     "analyst": {
-        "password_hash": hashlib.sha256(_analyst_pwd.encode()).hexdigest(),
+        "password_hash": generate_password_hash(_analyst_pwd),
         "role":          "analyst",
         "name":          "Security Analyst",
     },
@@ -205,8 +206,7 @@ def create_backend_app():
         user     = USERS.get(username)
         if not user:
             return jsonify({"error": "Invalid credentials"}), 401
-        pwd_hash = hashlib.sha256(password.encode()).hexdigest()
-        if not hmac.compare_digest(pwd_hash, user["password_hash"]):
+        if not check_password_hash(user["password_hash"], password):
             return jsonify({"error": "Invalid credentials"}), 401
         token = create_token(username, user["role"])
         return jsonify({
@@ -425,11 +425,12 @@ def create_backend_app():
 
     @app.route("/api/health", methods=["GET"])
     def health():
+        host = request.host.split(":")[0]
         return jsonify({
             "status":    "backend_active",
             "version":   "2.0.0",
-            "honeypot":  "http://localhost:5001",
-            "dashboard": "http://localhost:5000/dashboard",
+            "honeypot":  f"http://{host}:5001",
+            "dashboard": f"http://{host}:5000/dashboard",
         })
 
     return app
@@ -454,7 +455,7 @@ if __name__ == "__main__":
 ║  GET  /api/logs         — attack log list   [auth]   ║
 ║  GET  /api/stats        — aggregated stats  [auth]   ║
 ║  GET  /api/alerts       — alert list        [auth]   ║
-║  GET  /api/alerts       — alert list        [auth]   ║
+║  GET  /api/alerts/summary       — alert summary        [auth]   ║
 ║  GET  /api/honeypots    — list honeypots    [auth]   ║
 ║  POST /api/honeypots    — create honeypot   [admin]  ║
 ║  PUT  /api/honeypots/<id>      — update     [admin]  ║

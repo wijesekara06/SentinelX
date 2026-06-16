@@ -7,7 +7,7 @@ from honeypot.app import create_honeypot_app
 
 if __name__ == "__main__":
     app  = create_honeypot_app()
-    port = int(os.getenv("PORT", 5001))
+    port = int(os.getenv("HONEYPOT_PORT", 5001))
 
     print("""
 ╔══════════════════════════════════════════════════════════╗
@@ -47,7 +47,6 @@ if __name__ == "__main__":
 ╚══════════════════════════════════════════════════════════╝
 """)
     print(f"  Running on : http://localhost:{port}")
-    print(f"  Logs API   : http://localhost:{port}/api/logs")
-    print(f"  Stats API  : http://localhost:{port}/api/stats\n")
+    print(f"  Health API : http://localhost:{port}/api/health\n")
 
     app.run(host="0.0.0.0", port=port, debug=False)

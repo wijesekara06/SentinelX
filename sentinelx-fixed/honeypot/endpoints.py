@@ -331,8 +331,10 @@ def internal_docs(subpath=""):
 @honeypot_bp.route("/robots.txt", methods=["GET"])
 def robots():
     log_entry = process_request()
-    if log_entry is None:    # honeypot is disabled → honour it
+    if log_entry is None:
         return "", 404
+    if log_entry["_interaction_level"] == "passive":
+        return "", 200
     return (
         "User-agent: *\n"
         "Disallow: /admin/\n"

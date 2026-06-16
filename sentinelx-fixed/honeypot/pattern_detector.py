@@ -157,12 +157,26 @@ ATTACK_REGISTRY = [
 class BruteForceTracker:
     """Brute Force Detection using sliding window (time-aware, IP-scoped)."""
 
+    
+    MAX_TRACKED_IPS = 10000  # cap to prevent unbounded growth
+
     def __init__(self, threshold=5, window_seconds=60):
         self.threshold = threshold
         self.window    = window_seconds
         self._attempts = defaultdict(deque)
 
+    def _prune_ip(self, ip):
+        """Remove stale entries for this IP and evict if empty."""
+        now = time.time()
+        q = self._attempts[ip]
+        while q and (now - q[0]) > self.window:
+            q.popleft()
+        if not q and ip in self._attempts:
+            del self._attempts[ip]
+
     def record_failure(self, ip):
+        if len(self._attempts) >= self.MAX_TRACKED_IPS and ip not in self._attempts:
+            return  # shed new IPs when at capacity
         now = time.time()
         q   = self._attempts[ip]
         q.append(now)
@@ -170,11 +184,8 @@ class BruteForceTracker:
             q.popleft()
 
     def is_brute_force(self, ip):
-        now = time.time()
-        q   = self._attempts[ip]
-        while q and (now - q[0]) > self.window:
-            q.popleft()
-        return len(q) >= self.threshold
+        self._prune_ip(ip)
+        return len(self._attempts.get(ip, [])) >= self.threshold
 
     def attempt_count(self, ip):
         return len(self._attempts.get(ip, []))
@@ -186,13 +197,19 @@ class BruteForceTracker:
 class PatternDetector:
     """Implements Algorithm 02 — Pattern Recognition."""
 
+    MAX_TRACKED_IPS = 10000
+
     def __init__(self):
         self.brute_tracker = BruteForceTracker(threshold=5, window_seconds=60)
-        self._persistence  = defaultdict(list)
+        self._persistence  = {}  # ip -> (first_seen, last_seen)
 
     def analyze(self, source_ip, target_url, payload_str, is_login_fail=False):
         combined = target_url + " " + payload_str
-        self._persistence[source_ip].append(time.time())
+        now = time.time()
+        if source_ip in self._persistence:
+            self._persistence[source_ip] = (self._persistence[source_ip][0], now)
+        elif len(self._persistence) < self.MAX_TRACKED_IPS:
+            self._persistence[source_ip] = (now, now)
 
         # Signatures first — brute force only fires if no signature matched
         for attack in ATTACK_REGISTRY:
@@ -234,10 +251,10 @@ class PatternDetector:
         }
 
     def get_persistence(self, ip):
-        timestamps = self._persistence.get(ip, [])
-        if len(timestamps) < 2:
+        pair = self._persistence.get(ip)
+        if pair is None or pair[0] == pair[1]:
             return 0.0
-        duration_minutes = (timestamps[-1] - timestamps[0]) / 60.0
+        duration_minutes = (pair[1] - pair[0]) / 60.0
         return min(duration_minutes, 60.0)
 
 

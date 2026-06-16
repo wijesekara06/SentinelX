@@ -4,12 +4,11 @@ Developer : Janith Warawita (Alerts and QA)
 FR-06     : Real-time Alert Generation
 
 FIX v2:
-  - Alert threshold lowered from 5.0 to 2.5 to match RiskScorer label logic:
-      RiskScorer labels Medium when score > 2.5
+  - Alert threshold lowered from 5.0 to 3.5 to match RiskScorer label logic:
+      RiskScorer labels Medium when score > 3.5
       AlertGenerator previously only fired at score >= 5.0, silently dropping
-      all Medium-labeled events (scores 2.5–5.0) from the alerts list.
-  - MEDIUM_RISK_THRESHOLD renamed to ALERT_THRESHOLD for clarity.
-"""
+      all Medium-labeled events (scores 3.5–5.0) from the alerts list.
+  - MEDIUM_RISK_THRESHOLD renamed to ALERT_THRESHOLD for clarity."""
 
 import os
 import json
@@ -67,7 +66,8 @@ class AlertGenerator:
     def acknowledge(self, alert_id):
         for alert in self._alerts:
             if alert["id"] == alert_id:
-                alert["status"] = "acknowledged"
+                alert["status"]   = "acknowledged"
+                alert["acked_at"] = datetime.now(timezone.utc).isoformat()
                 self._save_alerts()
                 return True
         return False
@@ -83,6 +83,21 @@ class AlertGenerator:
 
     def _save_alerts(self):
         try:
+            # Re-read from disk first so we don't overwrite acks
+            # made by the backend since our last save
+            current = []
+            if os.path.exists(ALERTS_FILE):
+                with open(ALERTS_FILE, "r") as f:
+                    current = json.load(f)
+            # Build a map of existing alerts by id
+            existing = {a["id"]: a for a in current}
+            # Merge: our in-memory alerts take priority for new ones,
+            # but preserve ack status from disk for existing ones
+            for alert in self._alerts:
+                aid = alert["id"]
+                if aid in existing and existing[aid].get("status") == "acknowledged":
+                    alert["status"] = existing[aid]["status"]
+                    alert["acked_at"] = existing[aid].get("acked_at", "")
             with open(ALERTS_FILE, "w") as f:
                 json.dump(self._alerts, f, indent=2, default=str)
         except Exception as e:

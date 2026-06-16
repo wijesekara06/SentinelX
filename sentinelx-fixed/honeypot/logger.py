@@ -113,7 +113,6 @@ class ActivityLogger:
         label = entry.get("risk_label", "Low")
         color_map = {
             "Critical": Fore.RED,
-            "High":     Fore.RED,
             "Medium":   Fore.YELLOW,
             "Low":      Fore.CYAN,
         }
@@ -131,35 +130,4 @@ class ActivityLogger:
             f"Attack: {attack}{Style.RESET_ALL}"
         )
 
-    def read_logs(self, limit=100, filter_dict=None):
-        if self.collection is not None:
-            try:
-                cursor = self.collection.find(
-                    filter_dict or {},
-                    {"_id": 0}
-                ).sort("timestamp", -1).limit(limit)
-                return list(cursor)
-            except Exception as e:
-                console_log.error(f"MongoDB read error: {e}")
-
-        entries = []
-        try:
-            with open(LOG_FILE, "r") as f:
-                lines = f.readlines()
-                for line in reversed(lines):
-                    if len(entries) >= limit:
-                        break
-                    line = line.strip()
-                    if not line:
-                        continue
-                    try:
-                        entry = json.loads(line)
-                        if filter_dict:
-                            if not all(entry.get(k) == v for k, v in filter_dict.items()):
-                                continue
-                        entries.append(entry)
-                    except json.JSONDecodeError:
-                        pass
-        except FileNotFoundError:
-            pass
-        return entries
+    
