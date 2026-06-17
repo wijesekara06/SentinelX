@@ -25,6 +25,7 @@ import hashlib
 import base64
 import time
 from functools import wraps
+from collections import defaultdict
 from flask import Flask, request, jsonify, Response, send_from_directory
 from flask_cors import CORS
 from werkzeug.security import generate_password_hash, check_password_hash
@@ -57,6 +58,11 @@ USERS = {
         "name":          "Security Analyst",
     },
 }
+
+_failed_attempts  = defaultdict(int)
+_lockout_until    = {}
+LOCKOUT_THRESHOLD = 3
+LOCKOUT_SECONDS   = 300
 
 
 # ── JWT helpers ───────────────────────────────────────────────────────────────
@@ -203,11 +209,36 @@ def create_backend_app():
         data     = request.get_json() or {}
         username = data.get("username", "").strip()
         password = data.get("password", "")
-        user     = USERS.get(username)
+
+        now = time.time()
+        if username in _lockout_until:
+            if now < _lockout_until[username]:
+                remaining = int(_lockout_until[username] - now)
+                return jsonify({
+                    "error": f"Account locked. Try again in {remaining} seconds."
+                }), 429
+            else:
+                del _lockout_until[username]
+                _failed_attempts[username] = 0
+
+        user = USERS.get(username)
         if not user:
             return jsonify({"error": "Invalid credentials"}), 401
+
         if not check_password_hash(user["password_hash"], password):
-            return jsonify({"error": "Invalid credentials"}), 401
+            _failed_attempts[username] += 1
+            attempts_left = LOCKOUT_THRESHOLD - _failed_attempts[username]
+            if _failed_attempts[username] >= LOCKOUT_THRESHOLD:
+                _lockout_until[username] = now + LOCKOUT_SECONDS
+                _failed_attempts[username] = 0
+                return jsonify({
+                    "error": "Too many failed attempts. Account locked for 5 minutes."
+                }), 429
+            return jsonify({
+                "error": f"Invalid credentials. {attempts_left} attempt(s) remaining."
+            }), 401
+
+        _failed_attempts[username] = 0
         token = create_token(username, user["role"])
         return jsonify({
             "token":      token,
