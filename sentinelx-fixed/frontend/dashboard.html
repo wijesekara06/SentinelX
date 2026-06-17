@@ -77,6 +77,12 @@ body { background:var(--bg); color:var(--text); font-family:var(--sans); font-si
 .bar-count { font-size:.72rem; font-family:var(--mono); color:var(--text); width:24px; text-align:right; }
 .threat-item { display:flex; align-items:flex-start; gap:10px; padding:8px 0; border-bottom:1px solid var(--border); }
 .threat-item:last-child { border-bottom:none; }
+#feed {max-height: 320px;overflow-y: auto;padding-right: 4px;}
+#feed::-webkit-scrollbar { width: 4px; }
+#feed::-webkit-scrollbar-thumb { background: var(--border2); border-radius: 2px; }
+#alerts-panel {max-height: 320px;overflow-y: auto;padding-right: 4px;}
+#alerts-panel::-webkit-scrollbar { width: 4px; }
+#alerts-panel::-webkit-scrollbar-thumb { background: var(--border2); border-radius: 2px; }
 .threat-badge { padding:2px 8px; border-radius:2px; font-size:.65rem; font-family:var(--mono); font-weight:600; letter-spacing:.05em; min-width:68px; text-align:center; white-space:nowrap; margin-top:2px; }
 .badge-critical{background:rgba(255,71,87,.15);color:var(--red);border:1px solid rgba(255,71,87,.3)}
 .badge-medium{background:rgba(255,107,53,.15);color:var(--orange);border:1px solid rgba(255,107,53,.3)}
@@ -360,9 +366,32 @@ function renderChart(bd) {
     </div>`).join('');
 }
 
+function addTrace(time, ip, method, url, label) {        // ← ADD FROM HERE
+  const key = `${time}|${ip}|${url}`;
+  if (seen.has(key)) return;
+  seen.add(key);
+  const trace = document.getElementById('trace');
+  const color = label === 'Critical' ? 'var(--red)'
+              : label === 'Medium'   ? '#f59e0b'
+              : 'var(--teal)';
+  const line = document.createElement('div');
+  line.className = 'trace-line';
+  line.innerHTML = `
+    <span style="color:var(--muted)">${time}</span>
+    <span style="color:${color};font-weight:600">[${label.toUpperCase()}]</span>
+    <span style="color:var(--text)">${method}</span>
+    <span style="color:var(--muted);flex:1;overflow:hidden;text-overflow:ellipsis">${url}</span>
+    <span style="color:var(--red)">${ip}</span>
+  `;
+  trace.appendChild(line);
+  trace.scrollTop = trace.scrollHeight;
+} 
+
 async function loadLogs() {
+  const btn = document.querySelector('[onclick="loadLogs()"]');
+  if (btn) { btn.textContent = '⟳ Loading...'; btn.disabled = true; }
   try {
-    const d = await (await fetch(`${BE}/api/logs?limit=8`, {
+    const d = await (await fetch(`${BE}/api/logs?limit=500`, {
   headers: { 'Authorization': `Bearer ${tok}` }})).json();
     const logs = d.logs||[];
     const feed = document.getElementById('feed');
@@ -392,36 +421,67 @@ async function loadLogs() {
           <div class="threat-ip">${log.source_ip||'?'}</div>
         </div>`;
     }).join('');
-  } catch(e) {}
+  } catch(e) { console.error('loadLogs:', e); }
+  finally {
+    if (btn) { btn.textContent = '↺ Refresh'; btn.disabled = false; }
+  }
 }
 
 async function loadAlerts() {
+  const btn = document.querySelector('[onclick="loadAlerts()"]');
+  if (btn) { btn.textContent = '⟳ Loading...'; btn.disabled = true; }
   try {
-    const d = await (await fetch(`${BE}/api/logs?label=Critical&limit=6`, {
-  headers: { 'Authorization': `Bearer ${tok}` }})).json();
-    const logs  = d.logs||[];
-    const panel = document.getElementById('alerts-panel');
-    if (!logs.length) {
-      panel.innerHTML='<div class="empty-state">// no critical alerts</div>';
+    const d = await (await fetch(`${BE}/api/alerts?limit=500`, {
+      headers: { 'Authorization': `Bearer ${tok}` }})).json();
+    const alerts = d.alerts||[];
+    const panel  = document.getElementById('alerts-panel');
+    if (!alerts.length) {
+      panel.innerHTML='<div class="empty-state">// no active alerts</div>';
       return;
     }
-    panel.innerHTML = logs.map(log => `
-      <div class="alert-item">
+    panel.innerHTML = alerts.map(a => {
+      const label = a.risk_label||'Low';
+      const cls   = label==='Critical'?'badge-critical'
+                  : label==='Medium'  ?'badge-medium':'badge-low';
+      const acked = a.status==='acknowledged';
+      return `
+      <div class="alert-item" style="${acked?'opacity:0.5':''}">
         <div class="alert-header">
-          <span class="threat-badge badge-critical">CRITICAL</span>
+          <span class="threat-badge ${cls}">${label.toUpperCase()}</span>
           <span style="font-family:var(--mono);font-size:.7rem;color:var(--muted)">
-            Score: ${log.risk_score||0} | CVSS: ${log.cvss_score||'N/A'}
+            ${a.id||''} &nbsp;|&nbsp; Score: ${a.risk_score||0} | CVSS: ${a.cvss_score||'N/A'}
           </span>
+          ${acked
+            ? `<span style="font-size:.65rem;color:var(--muted);margin-left:auto">✓ acknowledged</span>`
+            : `<button onclick="ackAlert('${a.id}')"
+                style="margin-left:auto;font-size:.65rem;padding:2px 8px;border-radius:3px;
+                       border:1px solid var(--border);background:transparent;
+                       color:var(--muted);cursor:pointer">ACK</button>`
+          }
         </div>
         <div class="alert-body">
-          ${log.attack_type||'?'} detected on ${log.target_url||'/'}
+          ${a.attack_type||'?'} detected on ${a.target_url||'/'}
         </div>
         <div class="alert-meta">
-          IP: ${log.source_ip||'?'} | CVE: ${log.cve_id||'N/A'} |
-          ${(log.timestamp||'').substring(0,19)}
+          IP: ${a.source_ip||'?'} | CVE: ${a.cve_id||'N/A'} |
+          ${(a.timestamp||'').substring(0,19)}
         </div>
-      </div>`).join('');
-  } catch(e) {}
+      </div>`;
+    }).join('');
+  } catch(e) { console.error('loadAlerts:', e); }
+  finally {
+    if (btn) { btn.textContent = '↺ Refresh'; btn.disabled = false; }
+  }
+}
+
+async function ackAlert(id) {
+  try {
+    await fetch(`${BE}/api/alerts/${id}/ack`, {
+      method: 'POST',
+      headers: { 'Authorization': `Bearer ${tok}` }
+    });
+    loadAlerts();
+  } catch(e) { console.error('ackAlert:', e); }
 }
 
 // ── FR-01: Honeypot Configuration (UC-04) ──────────────────────────────────
