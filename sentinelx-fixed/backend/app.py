@@ -524,7 +524,110 @@ def create_backend_app():
                 "Content-Disposition": "attachment;filename=sentinelx_report.csv"
             }
         )
+    @app.route("/api/report/pdf", methods=["GET"])
+    @require_auth(roles=["admin"])
+    def export_pdf():
+        import io
+        from collections import defaultdict
+        from reportlab.lib.pagesizes import letter
+        from reportlab.lib import colors
+        from reportlab.lib.units import inch
+        from reportlab.platypus import SimpleDocTemplate, Table, TableStyle, Paragraph, Spacer
+        from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
 
+        limit = min(int(request.args.get("limit", 50)), 500)
+        logs  = read_logs(limit=limit)
+
+        risk_breakdown = defaultdict(int)
+        for log in read_logs(limit=10000):
+            risk_breakdown[log.get("risk_label", "Low")] += 1
+
+        audit_logger.log_action(
+            request.user.get("sub"), "pdf_export",
+            details={"row_count": len(logs)}, ip=request.remote_addr
+        )
+
+        buf = io.BytesIO()
+        doc = SimpleDocTemplate(
+            buf, pagesize=letter,
+            topMargin=0.6 * inch, bottomMargin=0.6 * inch,
+            leftMargin=0.6 * inch, rightMargin=0.6 * inch,
+        )
+        styles      = getSampleStyleSheet()
+        title_style = ParagraphStyle("TitleX", parent=styles["Title"], fontSize=18, spaceAfter=4)
+        meta_style  = ParagraphStyle("Meta", parent=styles["Normal"], fontSize=9, textColor=colors.grey)
+
+        elements = []
+        elements.append(Paragraph("SentinelX — Incident Report", title_style))
+        elements.append(Paragraph(
+            f"Generated {time.strftime('%Y-%m-%d %H:%M UTC', time.gmtime())} "
+            f"by {request.user.get('sub')}",
+            meta_style
+        ))
+        elements.append(Spacer(1, 16))
+
+        summary_data = [
+            ["Total events", "Critical", "Medium", "Low"],
+            [
+                str(sum(risk_breakdown.values())),
+                str(risk_breakdown.get("Critical", 0)),
+                str(risk_breakdown.get("Medium", 0)),
+                str(risk_breakdown.get("Low", 0)),
+            ],
+        ]
+        summary_table = Table(summary_data, colWidths=[1.6 * inch] * 4)
+        summary_table.setStyle(TableStyle([
+            ("BACKGROUND", (0, 0), (-1, 0), colors.HexColor("#1f2937")),
+            ("TEXTCOLOR", (0, 0), (-1, 0), colors.white),
+            ("FONTSIZE", (0, 0), (-1, -1), 10),
+            ("ALIGN", (0, 0), (-1, -1), "CENTER"),
+            ("GRID", (0, 0), (-1, -1), 0.5, colors.HexColor("#d1d5db")),
+            ("BOTTOMPADDING", (0, 0), (-1, -1), 8),
+            ("TOPPADDING", (0, 0), (-1, -1), 8),
+        ]))
+        elements.append(summary_table)
+        elements.append(Spacer(1, 20))
+
+        elements.append(Paragraph("Recent activity", styles["Heading2"]))
+        elements.append(Spacer(1, 8))
+
+        table_data = [["Time", "Source IP", "Attack type", "Risk", "Score", "CVE"]]
+        for log in logs:
+            table_data.append([
+                (log.get("timestamp") or "")[:19],
+                log.get("source_ip", ""),
+                log.get("attack_type", ""),
+                log.get("risk_label", ""),
+                str(log.get("risk_score", "")),
+                log.get("cve_id") or "N/A",
+            ])
+
+        log_table = Table(
+            table_data,
+            colWidths=[1.2 * inch, 0.9 * inch, 1.3 * inch, 0.7 * inch, 0.6 * inch, 1.1 * inch],
+            repeatRows=1,
+        )
+        log_table.setStyle(TableStyle([
+            ("BACKGROUND", (0, 0), (-1, 0), colors.HexColor("#374151")),
+            ("TEXTCOLOR", (0, 0), (-1, 0), colors.white),
+            ("FONTSIZE", (0, 0), (-1, -1), 8),
+            ("GRID", (0, 0), (-1, -1), 0.5, colors.HexColor("#d1d5db")),
+            ("ROWBACKGROUNDS", (0, 1), (-1, -1), [colors.white, colors.HexColor("#f9fafb")]),
+            ("BOTTOMPADDING", (0, 0), (-1, -1), 5),
+            ("TOPPADDING", (0, 0), (-1, -1), 5),
+        ]))
+        elements.append(log_table)
+
+        doc.build(elements)
+        buf.seek(0)
+
+        return Response(
+            buf.read(),
+            mimetype="application/pdf",
+            headers={
+                "Content-Disposition": "attachment;filename=sentinelx_report.pdf"
+            }
+        )
     # ── Health (public) ───────────────────────────────────────────────────────
 
     @app.route("/api/health", methods=["GET"])
@@ -546,32 +649,33 @@ if __name__ == "__main__":
     app  = create_backend_app()
     port = int(os.getenv("BACKEND_PORT", 5000))
     print("""
-╔══════════════════════════════════════════════════════╗
-║            SentinelX — Team A  (v2.0)               ║
-╠══════════════════════════════════════════════════════╣
-║  Pawani Wijesekara   — Honeypot Engineer             ║
-║  Naveesha Pathirathna — CVE Analyst                  ║
-║  Janith Warawita     — Alerts and QA                 ║
-║  Gimashi Gimhara     — Frontend Developer            ║
-╠══════════════════════════════════════════════════════╣
-║  POST /api/auth/login   — get JWT token              ║
-║  GET  /api/auth/me      — validate token             ║
-║  GET  /api/logs         — attack log list   [auth]   ║
-║  GET  /api/stats        — aggregated stats  [auth]   ║
-║  GET  /api/alerts       — alert list        [auth]   ║
-║  GET  /api/alerts/summary — alert summary   [auth]   ║
-║  GET  /api/honeypots    — list honeypots    [auth]   ║
-║  POST /api/honeypots    — create honeypot   [admin]  ║
-║  PUT  /api/honeypots/<id>      — update     [admin]  ║
-║  DEL  /api/honeypots/<id>      — delete     [admin]  ║
+╔═══════════════════════════════════════════════════════════╗
+║            SentinelX — Team A  (v2.0)                     ║
+╠═══════════════════════════════════════════════════════════╣
+║  Pawani Wijesekara   — Honeypot Engineer                  ║
+║  Naveesha Pathirathna — CVE Analyst                       ║
+║  Janith Warawita     — Alerts and QA                      ║
+║  Gimashi Gimhara     — Frontend Developer                 ║
+╠═══════════════════════════════════════════════════════════╣
+║  POST /api/auth/login   — get JWT token                   ║
+║  GET  /api/auth/me      — validate token                  ║
+║  GET  /api/logs         — attack log list   [auth]        ║
+║  GET  /api/stats        — aggregated stats  [auth]        ║
+║  GET  /api/alerts       — alert list        [auth]        ║
+║  GET  /api/alerts/summary — alert summary   [auth]        ║
+║  GET  /api/honeypots    — list honeypots    [auth]        ║
+║  POST /api/honeypots    — create honeypot   [admin]       ║
+║  PUT  /api/honeypots/<id>      — update     [admin]       ║
+║  DEL  /api/honeypots/<id>      — delete     [admin]       ║
 ║  POST /api/honeypots/<id>/toggle — enable/disable [admin] ║
 ║  GET  /api/honeypots/audit     — config audit log [admin] ║
-║  GET  /api/report/csv   — export CSV        [admin]  ║
-╠══════════════════════════════════════════════════════╣
-║  Credentials:                                        ║
-║    admin   / SentinelX@2026  (or env ADMIN_PASSWORD) ║
-║    analyst / Analyst@2026    (or env ANALYST_PASSWORD)║
-╚══════════════════════════════════════════════════════╝
+║  GET  /api/report/csv   — export CSV        [admin]       ║
+║  GET  /api/report/pdf   — export PDF        [admin]       ║
+╠═══════════════════════════════════════════════════════════╣
+║  Credentials:                                             ║
+║    admin   / SentinelX@2026  (or env ADMIN_PASSWORD)      ║
+║    analyst / Analyst@2026    (or env ANALYST_PASSWORD)    ║
+╚═══════════════════════════════════════════════════════════╝
 """)
     print(f"  Running on: http://localhost:{port}")
     print(f"  Dashboard:  http://localhost:{port}/dashboard\n")

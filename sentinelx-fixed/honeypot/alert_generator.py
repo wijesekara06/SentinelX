@@ -13,6 +13,7 @@ FIX v2:
 import os
 import json
 import uuid
+import threading
 from datetime import datetime, timezone
 from . import email_notifier
 
@@ -55,11 +56,29 @@ class AlertGenerator:
             f"CVE: {alert['cve_id'] or 'N/A'} | "
             f"CVSS: {alert['cvss_score'] or 'N/A'}"
         )
-        if email_notifier.send_alert_email(alert):
-            alert["channel"].append("email")
-            self._save_alerts()
+        threading.Thread(
+            target=self._send_email_and_record,
+            args=(alert,),
+            daemon=True
+        ).start()
 
         return alert
+
+    def _send_email_and_record(self, alert):
+        """
+        Sends the alert email on a background thread so the honeypot's
+        request/response cycle is never blocked by a slow SMTP call.
+        NFR-01: request processing latency must stay under 50ms — a
+        synchronous SMTP send (often 1-3+ seconds) would violate that
+        on every Medium/Critical event.
+        """
+        if email_notifier.send_alert_email(alert):
+            for a in self._alerts:
+                if a["id"] == alert["id"]:
+                    if "email" not in a["channel"]:
+                        a["channel"].append("email")
+                    break
+            self._save_alerts()
 
     def get_alerts(self, status=None, limit=50):
         alerts = self._alerts
