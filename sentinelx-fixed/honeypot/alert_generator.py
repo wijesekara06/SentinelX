@@ -14,6 +14,7 @@ import os
 import json
 import uuid
 from datetime import datetime, timezone
+from . import email_notifier
 
 ALERT_THRESHOLD = 3.5   # fire alert for anything labeled Medium or Critical
 ALERTS_FILE     = os.path.join(os.path.dirname(__file__), "alerts.json")
@@ -54,6 +55,9 @@ class AlertGenerator:
             f"CVE: {alert['cve_id'] or 'N/A'} | "
             f"CVSS: {alert['cvss_score'] or 'N/A'}"
         )
+        if email_notifier.send_alert_email(alert):
+            alert["channel"].append("email")
+            self._save_alerts()
 
         return alert
 
