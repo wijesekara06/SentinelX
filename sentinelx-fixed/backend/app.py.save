@@ -337,7 +337,7 @@ def create_backend_app():
             attack_breakdown[log.get("attack_type", "Unknown")] += 1
             risk_breakdown[log.get("risk_label", "Low")]        += 1
             ip_counts[log.get("source_ip", "?")]                += 1
-        top_ips = dict(
+=        top_ips = dict(
             sorted(ip_counts.items(), key=lambda x: x[1], reverse=True)[:10]
         )
         return jsonify({
@@ -424,7 +424,7 @@ def create_backend_app():
             )
         except ValueError as e:
             return jsonify({"error": str(e)}), 409
-        audit_logger.log_action(
+	audit_logger.log_action(
             request.user.get("sub"), "honeypot_create",
             details={"url": url, "service_type": service_type}, ip=request.remote_addr
         )
@@ -452,7 +452,7 @@ def create_backend_app():
 
         if hp is None:
             return jsonify({"error": "Honeypot not found"}), 404
-        audit_logger.log_action(
+	audit_logger.log_action(
             request.user.get("sub"), "honeypot_update",
             details={"hp_id": hp_id, "changes": allowed}, ip=request.remote_addr
         )
@@ -472,7 +472,7 @@ def create_backend_app():
         hp = config_manager.toggle(hp_id, actor=request.user.get("sub"))
         if hp is None:
             return jsonify({"error": "Honeypot not found"}), 404
-        audit_logger.log_action(
+	audit_logger.log_action(
             request.user.get("sub"), "honeypot_delete",
             details={"hp_id": hp_id}, ip=request.remote_addr
         )
@@ -496,7 +496,7 @@ def create_backend_app():
     def export_csv():
         import csv, io
         logs   = read_logs(limit=1000)
-        audit_logger.log_action(
+	audit_logger.log_action(
         request.user.get("sub"), "csv_export",
         details={"row_count": len(logs)}, ip=request.remote_addr)
         output = io.StringIO()
