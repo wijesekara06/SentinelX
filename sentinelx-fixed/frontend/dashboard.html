@@ -42,6 +42,9 @@ body { background:var(--bg); color:var(--text); font-family:var(--sans); font-si
 .topbar-user { font-size:.75rem; color:var(--muted); font-family:var(--mono); }
 .btn-logout { background:transparent; border:1px solid var(--border); color:var(--muted); padding:5px 12px; border-radius:2px; cursor:pointer; font-size:.75rem; font-family:var(--mono); transition:.15s; }
 .btn-logout:hover { color:var(--red); border-color:var(--red); }
+.btn-export { background:transparent; border:1px solid var(--border); color:var(--muted); padding:5px 12px; border-radius:2px; cursor:pointer; font-size:.75rem; font-family:var(--mono); transition:.15s; }
+.btn-export:hover { color:var(--accent); border-color:var(--accent); }
+.btn-export:disabled { opacity:.5; cursor:not-allowed; }
 .main { padding:20px; max-width:1400px; margin:0 auto; }
 .status-bar { background:var(--bg2); border:1px solid var(--border); border-radius:4px; padding:10px 16px; display:flex; align-items:center; gap:24px; margin-bottom:14px; font-family:var(--mono); font-size:.72rem; flex-wrap:wrap; }
 .status-item { display:flex; align-items:center; gap:8px; color:var(--muted); }
@@ -147,6 +150,8 @@ body { background:var(--bg); color:var(--text); font-family:var(--sans); font-si
     <div class="topbar-right">
       <div class="badge-active">SYSTEM ACTIVE</div>
       <div class="topbar-user" id="uname"></div>
+      <button class="btn-export" id="btn-csv" onclick="downloadReport('csv')">[ CSV ]</button>
+      <button class="btn-export" id="btn-pdf" onclick="downloadReport('pdf')">[ PDF ]</button>
       <button class="btn-logout" onclick="doLogout()">[ LOGOUT ]</button>
     </div>
   </div>
@@ -386,6 +391,37 @@ function addTrace(time, ip, method, url, label) {        // ← ADD FROM HERE
   trace.appendChild(line);
   trace.scrollTop = trace.scrollHeight;
 } 
+async function downloadReport(format) {
+  const btn      = document.getElementById(`btn-${format}`);
+  const original = btn.textContent;
+  btn.textContent = '[ ... ]';
+  btn.disabled    = true;
+  try {
+    const res = await fetch(`${BE}/api/report/${format}`, {
+      headers: { 'Authorization': `Bearer ${tok}` }
+    });
+    if (!res.ok) {
+      const err = await res.json().catch(() => ({}));
+      alert(err.error || `Failed to generate ${format.toUpperCase()} report`);
+      return;
+    }
+    const blob = await res.blob();
+    const url  = window.URL.createObjectURL(blob);
+    const a    = document.createElement('a');
+    a.href     = url;
+    a.download = `sentinelx_report.${format}`;
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+    window.URL.revokeObjectURL(url);
+  } catch (e) {
+    console.error(`downloadReport(${format}):`, e);
+    alert(`Failed to download ${format.toUpperCase()} report`);
+  } finally {
+    btn.textContent = original;
+    btn.disabled    = false;
+  }
+}
 
 async function loadLogs() {
   const btn = document.querySelector('[onclick="loadLogs()"]');
