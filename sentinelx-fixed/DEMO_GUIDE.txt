@@ -1,0 +1,209 @@
+# SentinelX — Full Project Demo Guide
+
+A complete walkthrough from system startup through every implemented feature, in the order you'd present it live.
+
+---
+
+## Part 1 — Start the system
+
+```bash
+cd ~/Downloads/SentinelX/sentinelx-fixed
+python3 run_all.py
+```
+
+Confirm both services start cleanly — honeypot on port 5001, backend on port 5000, no exceptions in the console. Open Firefox to:
+
+```
+http://localhost:5000/dashboard
+```
+
+---
+
+## Part 2 — Authentication & account lockout
+
+**Demonstrates:** FR-08 (Secure Authentication and Access Control), UC-02 Alternate Flow 1 (account lockout)
+
+1. On the login screen, enter username `admin` with an **incorrect** password and submit.
+   - Expected: `Invalid credentials. 2 attempt(s) remaining.`
+2. Try again, wrong password.
+   - Expected: `Invalid credentials. 1 attempt(s) remaining.`
+3. Try a third wrong password.
+   - Expected: `Too many failed attempts. Account locked for 5 minutes.`
+4. Try once more, even with the **correct** password.
+   - Expected: `Account locked. Try again in XXX seconds.` — shows enforcement is server-side, not a UI trick.
+5. Wait for the lockout to clear (or have a second pre-unlocked account ready), then log in successfully with `admin` / `SentinelX@2026`.
+
+---
+
+## Part 3 — Dashboard tour
+
+**Demonstrates:** FR-07 (Web-Based Dashboard and Reporting), UC-02 (Security Analyst Views Threat Intelligence Dashboard)
+
+Once logged in, walk through each panel:
+
+- **Top stat cards** — total threats blocked, active honeypots, system status, uptime
+- **Attack Vector Analysis chart** — breakdown of attack types seen so far
+- **Live Threat Feed** (left/main panel) — every request hitting the honeypot, scrollable, auto-refreshing
+- **Active Alerts** (right panel) — only Medium/Critical events that crossed the alert threshold, each with an ACK button
+- **`[ CSV ]` / `[ PDF ]` buttons** in the top-right toolbar — point these out now, demo them properly in Part 8
+
+---
+
+## Part 4 — Honeypot configuration management
+
+**Demonstrates:** FR-01 (Honeypot Deployment and Configuration), UC-04 (Administrator Configures Honeypot Endpoint)
+
+1. Navigate to the Honeypot Configuration panel.
+2. Click "Deploy Honeypot" / create new.
+3. Fill in a new endpoint, e.g.:
+   - URL: `/legacy-portal`
+   - Service type: `Login Panel`
+   - Interaction level: `active`
+4. Save — confirm it appears in the honeypot list immediately.
+5. Toggle it off, then back on — show the enable/disable switch works live.
+6. Mention: every one of these actions (create, update, toggle, delete) is now captured in the admin audit trail — proven in Part 7.
+
+---
+
+## Part 5 — Attack simulation
+
+**Demonstrates:** FR-02 (Continuous Activity Logging), FR-03 (Attack Pattern Recognition)
+
+Open a second terminal. Run each of these one at a time, switching back to the dashboard after each to show it land in the Live Threat Feed within seconds.
+
+**SQL Injection:**
+```bash
+curl -s -X POST http://localhost:5001/admin-login \
+  -d "username=admin&password=' OR 1=1 --"
+```
+
+**Cross-Site Scripting:**
+```bash
+curl -s -X POST http://localhost:5001/admin-login \
+  -d "username=<script>alert(1)</script>&password=test"
+```
+
+**Brute force (run several times rapidly):**
+```bash
+for pw in password 123456 admin letmein; do
+  curl -s -X POST http://localhost:5001/admin-login -d "username=admin&password=$pw"
+done
+```
+
+**Directory traversal:**
+```bash
+curl -s "http://localhost:5001/api/v1/users?file=../../../etc/hosts"
+```
+
+**Reconnaissance / scanning:**
+```bash
+curl -s http://localhost:5001/.git/config
+curl -s http://localhost:5001/phpmyadmin
+```
+
+**Sensitive file access:**
+```bash
+curl -s http://localhost:5001/.env
+curl -s http://localhost:5001/backup.zip
+```
+
+**Or, to generate a full realistic dataset in one shot:**
+```bash
+cd tests
+python3 test_honeypot.py
+```
+This runs all of the above plus command injection and API enumeration tests automatically, and prints a results summary at the end.
+
+---
+
+## Part 6 — CVE correlation & risk scoring
+
+**Demonstrates:** FR-04 (Automated CVE Correlation), FR-05 (Dynamic Risk Scoring)
+
+1. Pick one of the SQLi events just generated in the Live Threat Feed.
+2. Point out it's automatically tagged with:
+   - **Attack type** (e.g. "SQL Injection")
+   - **Risk score** (numeric, e.g. 4.35)
+   - **Risk label** (Low / Medium / Critical)
+   - **CVE ID** (e.g. CVE-2000-1233)
+   - **CVSS score** (e.g. 8.5)
+3. Explain: this mapping happens automatically the moment the request is captured — no analyst had to look anything up.
+
+---
+
+## Part 7 — Real-time alerts: dashboard + email
+
+**Demonstrates:** FR-06 (Real-Time Alert Generation)
+
+1. Have the alert inbox (`sentinelxalerts0@gmail.com`) visible on a second screen or browser tab.
+2. Trigger a high-severity attack:
+   ```bash
+   curl -s -X POST http://localhost:5001/admin-login \
+     -d "username=admin&password=' UNION SELECT username,password FROM users --"
+   ```
+3. Within seconds, two things happen simultaneously:
+   - A new entry appears in the dashboard's **Active Alerts** panel
+   - A new email arrives titled `[SentinelX] Critical alert — SQL Injection` with full incident context
+4. In the dashboard, click **ACK** on the alert — show it greys out and marks as acknowledged.
+
+---
+
+## Part 8 — Admin audit logging
+
+**Demonstrates:** NFR-07 (Audit Logging — *"All administrative actions shall be logged and retained"*)
+
+1. In the terminal:
+   ```bash
+   tail -10 backend/admin_audit.log
+   ```
+   Point out every login, alert ACK, and honeypot change you just performed is recorded — actor, action, timestamp, IP, success/failure, contextual details.
+
+2. Show it's also queryable as a proper API, not just a flat file:
+   ```bash
+   TOKEN=$(curl -s -X POST http://localhost:5000/api/auth/login \
+     -H "Content-Type: application/json" \
+     -d '{"username":"admin","password":"SentinelX@2026"}' \
+     | python3 -c "import sys,json;print(json.load(sys.stdin)['token'])")
+
+   curl -s "http://localhost:5000/api/audit?limit=10" \
+     -H "Authorization: Bearer $TOKEN"
+   ```
+
+3. Optionally filter by action:
+   ```bash
+   curl -s "http://localhost:5000/api/audit?action=login" \
+     -H "Authorization: Bearer $TOKEN"
+   ```
+
+---
+
+## Part 9 — Report export (PDF & CSV)
+
+**Demonstrates:** FR-07 (*"Authorized users shall be able to generate structured incident reports in PDF or CSV format"*)
+
+1. From the dashboard toolbar, click **`[ CSV ]`**.
+   - Button briefly shows `[ ... ]`, then `sentinelx_report.csv` downloads automatically.
+   - Open it — show the raw tabular log data.
+2. Click **`[ PDF ]`**.
+   - Same loading behavior, `sentinelx_report.pdf` downloads.
+   - Open it — show the formatted title, generated-by/timestamp header, summary table (Total/Critical/Medium/Low), and the detailed activity table.
+3. Confirm both exports also hit the audit trail:
+   ```bash
+   tail -5 backend/admin_audit.log
+   ```
+   You should see `csv_export` and `pdf_export` entries with a row count — tying this back to Part 8.
+
+---
+
+## Part 10 — Wrap-up
+
+1. Log out via `[ LOGOUT ]` in the top-right.
+2. Attempt to hit a protected API route with no token to show auth is actually enforced, not just hidden by the UI:
+   ```bash
+   curl -s http://localhost:5000/api/logs
+   ```
+   Expected: `{"error": "Missing token"}`
+
+---
+
+
