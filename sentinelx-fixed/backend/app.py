@@ -464,6 +464,10 @@ def create_backend_app():
         ok = config_manager.delete(hp_id, actor=request.user.get("sub"))
         if not ok:
             return jsonify({"error": "Honeypot not found"}), 404
+        audit_logger.log_action(
+            request.user.get("sub"), "honeypot_delete",
+            details={"hp_id": hp_id}, ip=request.remote_addr
+        )
         return jsonify({"status": "ok", "deleted": hp_id})
 
     @app.route("/api/honeypots/<hp_id>/toggle", methods=["POST"])
@@ -473,7 +477,7 @@ def create_backend_app():
         if hp is None:
             return jsonify({"error": "Honeypot not found"}), 404
         audit_logger.log_action(
-            request.user.get("sub"), "honeypot_delete",
+            request.user.get("sub"), "honeypot_toggle",
             details={"hp_id": hp_id}, ip=request.remote_addr
         )
         return jsonify({"status": "ok", "honeypot": hp})
@@ -488,7 +492,19 @@ def create_backend_app():
             "status": "ok",
             "audit":  audit_logger.get_audit_log(limit=limit, actor=actor, action=action),
         })
-
+    @app.route("/api/honeypots/audit", methods=["GET"])
+    @require_auth(roles=["admin"])
+    def honeypot_audit_log():
+        """
+        Returns the honeypot configuration audit trail — who created,
+        updated, toggled, or deleted each honeypot endpoint and when.
+        Separate from /api/audit which covers all admin actions system-wide.
+        """
+        limit = min(int(request.args.get("limit", 50)), 500)
+        return jsonify({
+            "status": "ok",
+            "audit":  config_manager.get_audit_log(limit=limit),
+        })
     # ── CSV export — admin only ───────────────────────────────────────────────
 
     @app.route("/api/report/csv", methods=["GET"])
