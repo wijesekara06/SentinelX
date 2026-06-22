@@ -14,6 +14,7 @@ import os
 import json
 import uuid
 import threading
+import fcntl
 from datetime import datetime, timezone
 from . import email_notifier
 
@@ -99,29 +100,51 @@ class AlertGenerator:
         if os.path.exists(ALERTS_FILE):
             try:
                 with open(ALERTS_FILE, "r") as f:
-                    return json.load(f)
-            except Exception:
-                pass
+                    content = f.read().strip()
+                    if content:
+                        return json.loads(content)
+            except (json.JSONDecodeError, ValueError):
+                print("[AlertGenerator] alerts.json unreadable on startup, starting with empty list")
         return []
 
     def _save_alerts(self):
+        """
+        Write alerts to disk with an exclusive file lock so concurrent
+        Gunicorn worker processes cannot corrupt the JSON by writing
+        simultaneously. Uses a separate .lock file to avoid truncating
+        alerts.json while it is being locked.
+        """
+        lock_path = ALERTS_FILE + ".lock"
         try:
-            # Re-read from disk first so we don't overwrite acks
-            # made by the backend since our last save
-            current = []
-            if os.path.exists(ALERTS_FILE):
-                with open(ALERTS_FILE, "r") as f:
-                    current = json.load(f)
-            # Build a map of existing alerts by id
-            existing = {a["id"]: a for a in current}
-            # Merge: our in-memory alerts take priority for new ones,
-            # but preserve ack status from disk for existing ones
-            for alert in self._alerts:
-                aid = alert["id"]
-                if aid in existing and existing[aid].get("status") == "acknowledged":
-                    alert["status"] = existing[aid]["status"]
-                    alert["acked_at"] = existing[aid].get("acked_at", "")
-            with open(ALERTS_FILE, "w") as f:
-                json.dump(self._alerts, f, indent=2, default=str)
+            with open(lock_path, "w") as lock_file:
+                fcntl.flock(lock_file.fileno(), fcntl.LOCK_EX)
+                try:
+                    # Re-read current disk state inside the lock
+                    current = []
+                    if os.path.exists(ALERTS_FILE):
+                        try:
+                            with open(ALERTS_FILE, "r") as f:
+                                content = f.read().strip()
+                                if content:
+                                    current = json.loads(content)
+                        except (json.JSONDecodeError, ValueError):
+                            # File was corrupt — start clean rather than
+                            # propagating bad data across worker processes
+                            print("[AlertGenerator] alerts.json corrupt, resetting to clean state")
+                            current = []
+
+                    # Preserve ack status for any alerts acknowledged
+                    # via the dashboard while we were running
+                    existing = {a["id"]: a for a in current}
+                    for alert in self._alerts:
+                        aid = alert["id"]
+                        if aid in existing and existing[aid].get("status") == "acknowledged":
+                            alert["status"]   = existing[aid]["status"]
+                            alert["acked_at"] = existing[aid].get("acked_at", "")
+
+                    with open(ALERTS_FILE, "w") as f:
+                        json.dump(self._alerts, f, indent=2, default=str)
+                finally:
+                    fcntl.flock(lock_file.fileno(), fcntl.LOCK_UN)
         except Exception as e:
             print(f"[AlertGenerator] Save error: {e}")

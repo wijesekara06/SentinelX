@@ -65,12 +65,22 @@ View this alert in the Command Center dashboard.
     msg["Subject"] = subject
     msg.attach(MIMEText(body, "plain"))
 
-    try:
-        with smtplib.SMTP(SMTP_HOST, SMTP_PORT, timeout=10) as server:
-            server.starttls()
-            server.login(SMTP_USER, SMTP_PASSWORD)
-            server.sendmail(SMTP_USER, ALERT_EMAIL_TO, msg.as_string())
-        return True
-    except Exception as e:
-        print(f"[EmailNotifier] Failed to send alert email: {e}")
-        return False
+    import time as _time
+    for attempt in range(3):
+        try:
+            with smtplib.SMTP(SMTP_HOST, SMTP_PORT, timeout=10) as server:
+                server.starttls()
+                server.login(SMTP_USER, SMTP_PASSWORD)
+                server.sendmail(SMTP_USER, ALERT_EMAIL_TO, msg.as_string())
+            return True
+        except smtplib.SMTPResponseException as e:
+            if e.smtp_code == 421 and attempt < 2:
+                # Gmail temporary throttle — wait and retry
+                _time.sleep(2 ** attempt)
+                continue
+            print(f"[EmailNotifier] Failed to send alert email: {e}")
+            return False
+        except Exception as e:
+            print(f"[EmailNotifier] Failed to send alert email: {e}")
+            return False
+    return False
