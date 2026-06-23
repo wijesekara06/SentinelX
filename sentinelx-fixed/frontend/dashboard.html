@@ -321,7 +321,16 @@ async function doLogin() {
   }
 }
 
-function doLogout() {
+async function doLogout() {
+  // Tell the server to revoke the token before we clear it locally
+  if (tok) {
+    try {
+      await fetch(`${BE}/api/auth/logout`, {
+        method:  'POST',
+        headers: { 'Authorization': `Bearer ${tok}` }
+      });
+    } catch(e) { /* ignore — if the server is unreachable we still clear locally */ }
+  }
   tok = null;
   document.getElementById('login-screen').style.display = 'flex';
   document.getElementById('app').style.display = 'none';

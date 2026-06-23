@@ -33,7 +33,7 @@ from werkzeug.security import generate_password_hash, check_password_hash
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
 from honeypot.config_manager import HoneypotConfigManager, VALID_INTERACTION_LEVELS
 import audit_logger
-
+import security as sec
 config_manager = HoneypotConfigManager()
 
 # ── Secrets — load from env in production, fall back to dev defaults ──────────
@@ -88,6 +88,8 @@ def create_token(username, role):
     return f"{header}.{payload}.{sig}"
 
 def verify_token(token):
+    if sec.token_blacklist.is_revoked(token):
+        return None
     try:
         parts = token.split(".")
         if len(parts) != 3:
@@ -192,6 +194,28 @@ def create_backend_app():
         }
     })
 
+    # ── Security: inject headers into every response ──────────────────────────
+    app.after_request(sec.apply_security_headers)
+
+    # ── Security: per-IP rate limiting ────────────────────────────────────────
+    @app.before_request
+    def enforce_rate_limit():
+        ip = request.remote_addr or "unknown"
+        if request.path.startswith("/api/auth"):
+            if not sec.auth_limiter.is_allowed(ip):
+                retry = sec.auth_limiter.retry_after(ip)
+                return jsonify({
+                    "error": f"Too many requests. Retry after {retry} seconds."
+                }), 429
+        elif request.path.startswith("/api/"):
+            if not sec.api_limiter.is_allowed(ip):
+                retry = sec.api_limiter.retry_after(ip)
+                return jsonify({
+                    "error": f"Rate limit exceeded. Retry after {retry} seconds."
+                }), 429
+
+    # ── Dashboard (public) ────────────────────────────────────────────────────
+
     # ── Dashboard (public) ────────────────────────────────────────────────────
 
     @app.route("/")
@@ -208,9 +232,22 @@ def create_backend_app():
     @app.route("/api/auth/login", methods=["POST"])
     def login():
         data = request.get_json() or {}
-        username = data.get("username", "").strip()
+
+        # Sanitize first — strip non-printables and validate format
+        username = sec.sanitize(data.get("username", "").strip(), max_len=64)
         password = data.get("password", "")
 
+        if not sec.is_safe_username(username):
+            audit_logger.log_action(
+                "unknown", "login",
+                ip=request.remote_addr,
+                success=False,
+                details={"reason": "invalid_username_format"},
+            )
+            return jsonify({"error": "Invalid credentials"}), 401
+
+        if not isinstance(password, str) or len(password) > 256:
+            return jsonify({"error": "Invalid credentials"}), 401
         now = time.time()
 
         if username in _lockout_until:
@@ -301,13 +338,31 @@ def create_backend_app():
     @app.route("/api/auth/me", methods=["GET"])
     @require_auth()
     def me():
-
-
         """Validate a stored token and return the current user info."""
         return jsonify({
             "username": request.user.get("sub"),
             "role":     request.user.get("role"),
         })
+
+    @app.route("/api/auth/logout", methods=["POST"])
+    @require_auth()
+    def logout():
+        """
+        Revoke the current JWT so it cannot be reused after logout.
+        The token signature is added to the blacklist until its natural expiry.
+        """
+        auth_header = request.headers.get("Authorization", "")
+        token       = auth_header[7:] if auth_header.startswith("Bearer ") else ""
+        exp         = request.user.get("exp", time.time())
+        if token:
+            sec.token_blacklist.revoke(token, exp)
+        audit_logger.log_action(
+            request.user.get("sub"), "logout",
+            ip=request.remote_addr, success=True,
+        )
+        return jsonify({"status": "ok", "message": "Logged out successfully"})
+
+    # ── Logs — requires auth (admin or analyst) ───────────────────────────────
 
     # ── Logs — requires auth (admin or analyst) ───────────────────────────────
 
