@@ -34,6 +34,8 @@ sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
 from honeypot.config_manager import HoneypotConfigManager, VALID_INTERACTION_LEVELS
 import audit_logger
 import security as sec
+import mfa as mfa_module
+
 config_manager = HoneypotConfigManager()
 
 # ── Secrets — load from env in production, fall back to dev defaults ──────────
@@ -111,6 +113,26 @@ def verify_token(token):
     except Exception:
         return None
 
+def create_mfa_token(username, role):
+    """
+    Create a short-lived (5 minute) token used only during the MFA step.
+    It has mfa_pending=True so require_auth() will reject it everywhere
+    except /api/auth/mfa/verify, which checks for that flag explicitly.
+    This means a stolen mfa_token cannot be used to access the dashboard.
+    """
+    header  = _b64(json.dumps({"alg": "HS256", "typ": "JWT"}).encode())
+    payload = _b64(json.dumps({
+        "sub":         username,
+        "role":        role,
+        "iat":         int(time.time()),
+        "exp":         int(time.time()) + 300,  # 5 minutes only
+        "mfa_pending": True,
+    }).encode())
+    sig_input = f"{header}.{payload}".encode()
+    sig = _b64(hmac.new(JWT_SECRET.encode(), sig_input, hashlib.sha256).digest())
+    return f"{header}.{payload}.{sig}"
+
+
 def require_auth(roles=None):
     """Decorator that enforces JWT authentication and optional role check."""
     def decorator(f):
@@ -123,13 +145,16 @@ def require_auth(roles=None):
             claims = verify_token(token)
             if not claims:
                 return jsonify({"error": "Token invalid or expired"}), 401
+            # Reject MFA pending tokens — they can only be used with
+            # /api/auth/mfa/verify, not with any protected endpoint
+            if claims.get("mfa_pending"):
+                return jsonify({"error": "MFA verification required"}), 401
             if roles and claims.get("role") not in roles:
                 return jsonify({"error": "Insufficient permissions"}), 403
             request.user = claims
             return f(*args, **kwargs)
         return wrapper
     return decorator
-
 
 # ── File helpers ──────────────────────────────────────────────────────────────
 
@@ -318,6 +343,20 @@ def create_backend_app():
 
         _failed_attempts[username] = 0
 
+        # If MFA is enabled for this user, don't issue the real JWT yet.
+        # Return a short-lived mfa_token and let the frontend handle step 2.
+        if mfa_module.is_mfa_enabled(username):
+            mfa_tok = create_mfa_token(username, user["role"])
+            audit_logger.log_action(
+                username, "login_mfa_required",
+                ip=request.remote_addr, success=True,
+            )
+            return jsonify({
+                "mfa_required": True,
+                "mfa_token":    mfa_tok,
+            })
+
+        # MFA not set up — issue the full JWT immediately
         token = create_token(username, user["role"])
 
         audit_logger.log_action(
@@ -362,7 +401,113 @@ def create_backend_app():
         )
         return jsonify({"status": "ok", "message": "Logged out successfully"})
 
-    # ── Logs — requires auth (admin or analyst) ───────────────────────────────
+    # ── MFA endpoints ─────────────────────────────────────────────────────────
+
+    @app.route("/api/auth/mfa/verify", methods=["POST"])
+    def mfa_verify():
+        """
+        Step 2 of login when MFA is enabled.
+        Accepts the short-lived mfa_token from /api/auth/login plus the
+        6-digit TOTP code. Returns a full JWT on success.
+        """
+        data      = request.get_json() or {}
+        mfa_token = data.get("mfa_token", "")
+        code      = str(data.get("code", "")).strip()
+
+        # Verify the MFA pending token (must be signed and not expired)
+        claims = verify_token(mfa_token)
+        if not claims or not claims.get("mfa_pending"):
+            return jsonify({"error": "Invalid or expired MFA session"}), 401
+
+        username = claims.get("sub")
+
+        if not mfa_module.verify_mfa(username, code):
+            audit_logger.log_action(
+                username, "mfa_verify",
+                ip=request.remote_addr, success=False,
+                details={"reason": "wrong_code"},
+            )
+            return jsonify({"error": "Invalid MFA code"}), 401
+
+        # Code is correct — issue the real JWT
+        role  = claims.get("role")
+        token = create_token(username, role)
+
+        audit_logger.log_action(
+            username, "login",
+            ip=request.remote_addr, success=True,
+            details={"mfa": "verified"},
+        )
+
+        user = USERS.get(username, {})
+        return jsonify({
+            "token":      token,
+            "role":       role,
+            "name":       user.get("name", username),
+            "expires_in": JWT_EXPIRY,
+        })
+
+    @app.route("/api/auth/mfa/setup", methods=["POST"])
+    @require_auth(roles=["admin"])
+    def mfa_setup():
+        """
+        Generate a TOTP secret for the current admin.
+        MFA is NOT active until /api/auth/mfa/confirm is called.
+        """
+        username = request.user.get("sub")
+        result   = mfa_module.setup_mfa(username)
+        audit_logger.log_action(
+            username, "mfa_setup",
+            ip=request.remote_addr, success=True,
+        )
+        return jsonify({
+            "status":       "ok",
+            "secret":       result["secret"],
+            "uri":          result["uri"],
+            "backup_codes": result["backup_codes"],
+        })
+
+    @app.route("/api/auth/mfa/confirm", methods=["POST"])
+    @require_auth(roles=["admin"])
+    def mfa_confirm():
+        """Activate MFA by verifying the first code from the authenticator app."""
+        data     = request.get_json() or {}
+        code     = str(data.get("code", "")).strip()
+        username = request.user.get("sub")
+
+        if not mfa_module.confirm_mfa(username, code):
+            return jsonify({
+                "error": "Invalid code. Make sure your authenticator app is set up correctly."
+            }), 400
+
+        audit_logger.log_action(
+            username, "mfa_enabled",
+            ip=request.remote_addr, success=True,
+        )
+        return jsonify({"status": "ok", "message": "MFA enabled successfully"})
+
+    @app.route("/api/auth/mfa/status", methods=["GET"])
+    @require_auth()
+    def mfa_status():
+        """Return the MFA status for the currently logged-in user."""
+        username = request.user.get("sub")
+        return jsonify({
+            "status": "ok",
+            **mfa_module.get_status(username),
+        })
+
+    @app.route("/api/auth/mfa/disable", methods=["POST"])
+    @require_auth(roles=["admin"])
+    def mfa_disable():
+        """Remove MFA for the current admin (recovery operation)."""
+        username = request.user.get("sub")
+        mfa_module.disable_mfa(username)
+        audit_logger.log_action(
+            username, "mfa_disabled",
+            ip=request.remote_addr, success=True,
+        )
+        return jsonify({"status": "ok", "message": "MFA disabled"})
+
 
     # ── Logs — requires auth (admin or analyst) ───────────────────────────────
 

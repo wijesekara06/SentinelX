@@ -1,0 +1,17 @@
+{
+  "admin": {
+    "secret": "OP3P36D2LGTGZKPRRBNL6TLHKMBBGWJW",
+    "enabled": true,
+    "backup_codes": [
+      "DABECB95",
+      "C3DCD80F",
+      "5CF23EC4",
+      "C0E5F27E",
+      "D8714FD2",
+      "8ADF3D12",
+      "45E32266",
+      "D1676C10"
+    ],
+    "created_at": "2026-06-23T16:24:42Z"
+  }
+}

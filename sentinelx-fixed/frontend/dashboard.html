@@ -120,6 +120,23 @@ body { background:var(--bg); color:var(--text); font-family:var(--sans); font-si
 .hp-btn { background:transparent; border:1px solid var(--border); color:var(--muted); padding:4px 10px; border-radius:2px; cursor:pointer; font-size:.7rem; font-family:var(--mono); transition:.15s; }
 .hp-btn:hover { color:var(--accent); border-color:var(--accent); }
 .hp-btn.danger:hover { color:var(--red); border-color:var(--red); }
+/* MFA screen */
+#mfa-screen { position:fixed; inset:0; background:var(--bg); display:none; align-items:center; justify-content:center; z-index:200; }
+.mfa-card { background:var(--bg2); border:1px solid var(--border2); border-radius:4px; padding:40px; width:400px; position:relative; }
+.mfa-card::before { content:''; position:absolute; top:0; left:0; right:0; height:2px; background:linear-gradient(90deg,transparent,var(--purple),transparent); }
+.mfa-title { text-align:center; margin-bottom:24px; }
+.mfa-title h2 { font-family:var(--mono); font-size:1.2rem; color:var(--purple); letter-spacing:.12em; }
+.mfa-title p { font-size:.75rem; color:var(--muted); margin-top:6px; }
+.mfa-code-input { width:100%; padding:14px; background:var(--bg3); border:1px solid var(--border2); border-radius:3px; color:var(--text); font-size:1.6rem; font-family:var(--mono); margin-bottom:16px; outline:none; text-align:center; letter-spacing:.3em; transition:.15s; }
+.mfa-code-input:focus { border-color:var(--purple); }
+/* MFA setup panel */
+.mfa-secret-box { background:var(--bg); border:1px solid var(--border); border-radius:3px; padding:12px; font-family:var(--mono); font-size:.8rem; color:var(--accent); word-break:break-all; margin:10px 0; }
+.mfa-backup-grid { display:grid; grid-template-columns:1fr 1fr; gap:6px; margin:10px 0; }
+.mfa-backup-code { background:var(--bg); border:1px solid var(--border); border-radius:3px; padding:6px 10px; font-family:var(--mono); font-size:.75rem; color:var(--green); text-align:center; }
+.btn-mfa { width:100%; padding:11px; background:rgba(167,139,250,.15); border:1px solid var(--purple); border-radius:3px; color:var(--purple); font-family:var(--sans); font-size:.9rem; font-weight:700; cursor:pointer; letter-spacing:.05em; text-transform:uppercase; transition:.15s; margin-top:4px; }
+.btn-mfa:hover { background:rgba(167,139,250,.25); }
+.btn-mfa-danger { background:rgba(255,71,87,.1); border-color:rgba(255,71,87,.4); color:var(--red); }
+.btn-mfa-danger:hover { background:rgba(255,71,87,.2); }
 </style>
 </head>
 <body>
@@ -139,7 +156,24 @@ body { background:var(--bg); color:var(--text); font-family:var(--sans); font-si
     <div class="login-error" id="login-err"></div>
   </div>
 </div>
+<div id="mfa-screen">
+  <div class="mfa-card">
+    <div class="mfa-title">
+      <h2>MFA VERIFICATION</h2>
+      <p>Enter the 6-digit code from your authenticator app</p>
+    </div>
+    <input class="mfa-code-input" type="text" id="mfa-code"
+           inputmode="numeric" maxlength="8" placeholder="000000"
+           autocomplete="one-time-code" />
+    <button class="btn-auth" onclick="doMfaVerify()">Verify</button>
+    <div class="login-error" id="mfa-err"></div>
+    <div style="text-align:center;margin-top:14px;font-size:.72rem;color:var(--muted);font-family:var(--mono);">
+      Lost your phone? Enter a backup code instead.
+    </div>
+  </div>
+</div>
 
+<div id="app">
 <div id="app">
   <div class="topbar">
     <div class="topbar-left">
@@ -297,6 +331,8 @@ const COLORS = {
   'Reconnaissance':'bf-teal',
 };
 
+let mfaPendingToken = null;
+
 async function doLogin() {
   const user = document.getElementById('u').value.trim();
   const pass = document.getElementById('p').value;
@@ -310,15 +346,62 @@ async function doLogin() {
     });
     const d = await r.json();
     if (!r.ok) { err.textContent = d.error||'Login failed'; return; }
-    tok = d.token;
-    document.getElementById('uname').textContent = `[ ${d.name.toUpperCase()} ]`;
-    document.getElementById('login-screen').style.display = 'none';
-    document.getElementById('app').style.display = 'block';
-    loadAll();
-    setInterval(loadAll, 8000);
+
+    // If the server says MFA is required, move to the second screen
+    if (d.mfa_required) {
+      mfaPendingToken = d.mfa_token;
+      document.getElementById('login-screen').style.display = 'none';
+      document.getElementById('mfa-screen').style.display = 'flex';
+      document.getElementById('mfa-code').focus();
+      return;
+    }
+
+    // No MFA — proceed straight to dashboard
+    enterDashboard(d);
   } catch(e) {
-    err.textContent = 'Cannot connect. Run: python backend/app.py';
+    err.textContent = 'Cannot connect. Run: python run_all.py';
   }
+}
+
+async function doMfaVerify() {
+  const code = document.getElementById('mfa-code').value.trim();
+  const err  = document.getElementById('mfa-err');
+  err.textContent = '';
+  if (!code) { err.textContent = 'Enter the 6-digit code'; return; }
+  try {
+    const r = await fetch(`${BE}/api/auth/mfa/verify`, {
+      method:'POST',
+      headers:{'Content-Type':'application/json'},
+      body:JSON.stringify({mfa_token: mfaPendingToken, code})
+    });
+    const d = await r.json();
+    if (!r.ok) { err.textContent = d.error||'Verification failed'; return; }
+    mfaPendingToken = null;
+    document.getElementById('mfa-screen').style.display = 'none';
+    enterDashboard(d);
+  } catch(e) {
+    err.textContent = 'Connection error';
+  }
+}
+
+// Allow pressing Enter on the MFA code input
+document.addEventListener('DOMContentLoaded', () => {
+  const mfaInput = document.getElementById('mfa-code');
+  if (mfaInput) {
+    mfaInput.addEventListener('keydown', e => {
+      if (e.key === 'Enter') doMfaVerify();
+    });
+  }
+});
+
+function enterDashboard(d) {
+  tok = d.token;
+  document.getElementById('uname').textContent = `[ ${d.name.toUpperCase()} ]`;
+  document.getElementById('login-screen').style.display = 'none';
+  document.getElementById('mfa-screen').style.display  = 'none';
+  document.getElementById('app').style.display = 'block';
+  loadAll();
+  setInterval(loadAll, 8000);
 }
 
 async function doLogout() {
