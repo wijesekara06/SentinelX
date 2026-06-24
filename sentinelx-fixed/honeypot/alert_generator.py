@@ -99,10 +99,15 @@ class AlertGenerator:
     def _load_alerts(self):
         if os.path.exists(ALERTS_FILE):
             try:
+                import encryption  # NFR-06: AES-256 at rest
                 with open(ALERTS_FILE, "r") as f:
                     content = f.read().strip()
-                    if content:
-                        return json.loads(content)
+                if content:
+                    try:
+                        content = encryption.decrypt(content)
+                    except Exception:
+                        pass  # graceful fallback for pre-encryption data
+                    return json.loads(content)
             except (json.JSONDecodeError, ValueError):
                 print("[AlertGenerator] alerts.json unreadable on startup, starting with empty list")
         return []
@@ -121,17 +126,20 @@ class AlertGenerator:
                 try:
                     # Re-read current disk state inside the lock
                     current = []
-                    if os.path.exists(ALERTS_FILE):
-                        try:
-                            with open(ALERTS_FILE, "r") as f:
-                                content = f.read().strip()
+                        if os.path.exists(ALERTS_FILE):
+                            try:
+                                import encryption  # NFR-06
+                                with open(ALERTS_FILE, "r") as f:
+                                    content = f.read().strip()
                                 if content:
+                                    try:
+                                        content = encryption.decrypt(content)
+                                    except Exception:
+                                        pass
                                     current = json.loads(content)
-                        except (json.JSONDecodeError, ValueError):
-                            # File was corrupt — start clean rather than
-                            # propagating bad data across worker processes
-                            print("[AlertGenerator] alerts.json corrupt, resetting to clean state")
-                            current = []
+                            except (json.JSONDecodeError, ValueError):
+                                print("[AlertGenerator] alerts.json corrupt, resetting to clean state")
+                                current = []
 
                     # Preserve ack status for any alerts acknowledged
                     # via the dashboard while we were running
@@ -142,8 +150,10 @@ class AlertGenerator:
                             alert["status"]   = existing[aid]["status"]
                             alert["acked_at"] = existing[aid].get("acked_at", "")
 
+                    import encryption  # NFR-06: AES-256 at rest
+                    json_str = json.dumps(self._alerts, indent=2, default=str)
                     with open(ALERTS_FILE, "w") as f:
-                        json.dump(self._alerts, f, indent=2, default=str)
+                        f.write(encryption.encrypt(json_str))
                 finally:
                     fcntl.flock(lock_file.fileno(), fcntl.LOCK_UN)
         except Exception as e:

@@ -35,11 +35,13 @@ def log_action(actor, action, details=None, ip=None, success=True):
         "ip":        ip or "unknown",
         "details":   details or {},
     }
+    
     try:
+        import encryption  # NFR-06: AES-256 at rest
+        line = json.dumps(entry, default=str)
         with open(AUDIT_FILE, "a") as f:
-            f.write(json.dumps(entry, default=str) + "\n")
+            f.write(encryption.encrypt(line) + "\n")
     except Exception as e:
-        # Never let audit logging crash the request it's logging
         print(f"[AuditLogger] Failed to write audit entry: {e}")
 
 
@@ -59,6 +61,11 @@ def get_audit_log(limit=100, actor=None, action=None):
                 if not line:
                     continue
                 try:
+                    import encryption  # NFR-06: AES-256 at rest
+                    try:
+                        line = encryption.decrypt(line)
+                    except Exception:
+                        pass  # graceful fallback for any pre-encryption entries
                     entries.append(json.loads(line))
                 except json.JSONDecodeError:
                     continue

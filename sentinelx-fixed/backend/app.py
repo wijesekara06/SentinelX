@@ -177,6 +177,11 @@ def read_logs(limit=500, filters=None):
             if not line:
                 continue
             try:
+                import encryption  # NFR-06: AES-256 at rest
+                try:
+                    line = encryption.decrypt(line)
+                except Exception:
+                    pass  # graceful fallback for pre-encryption lines
                 entry = json.loads(line)
                 entry["_id"] = str(len(lines) - i)
                 if filters:
@@ -196,15 +201,24 @@ def read_logs(limit=500, filters=None):
 def load_alerts():
     if os.path.exists(ALERTS_FILE):
         try:
+            import encryption  # NFR-06: AES-256 at rest
             with open(ALERTS_FILE, "r") as f:
-                return json.load(f)
+                content = f.read().strip()
+            if content:
+                try:
+                    content = encryption.decrypt(content)
+                except Exception:
+                    pass  # graceful fallback for pre-encryption data
+                return json.loads(content)
         except Exception:
             pass
     return []
 
 def save_alerts(alerts):
+    import encryption  # NFR-06: AES-256 at rest
+    json_str = json.dumps(alerts, indent=2, default=str)
     with open(ALERTS_FILE, "w") as f:
-        json.dump(alerts, f, indent=2, default=str)
+        f.write(encryption.encrypt(json_str))
 
 
 # ── App factory ───────────────────────────────────────────────────────────────

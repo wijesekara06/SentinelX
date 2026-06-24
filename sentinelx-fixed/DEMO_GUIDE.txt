@@ -8,6 +8,7 @@ A complete walkthrough from system startup through every implemented feature, in
 
 ```bash
 cd ~/Downloads/SentinelX/sentinelx-fixed
+rm -f honeypot/alerts.json honeypot/honeypot_activity.log backend/admin_audit.log
 python3 run_all.py
 ```
 

@@ -104,8 +104,10 @@ class ActivityLogger:
                 console_log.warning(f"MongoDB write failed: {e}")
 
         try:
+            import encryption  # NFR-06: AES-256 at rest
+            line = json.dumps(entry, default=str)
             with open(LOG_FILE, "a") as f:
-                f.write(json.dumps(entry, default=str) + "\n")
+                f.write(encryption.encrypt(line) + "\n")
         except Exception as e:
             console_log.error(f"File logging failed: {e}")
 

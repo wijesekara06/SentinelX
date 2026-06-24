@@ -12,3 +12,4 @@ honeypot/alerts.json
 backend/admin_audit.log
 cert.pem
 key.pem
+sentinelx.key
