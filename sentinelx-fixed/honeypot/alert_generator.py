@@ -126,20 +126,20 @@ class AlertGenerator:
                 try:
                     # Re-read current disk state inside the lock
                     current = []
-                        if os.path.exists(ALERTS_FILE):
-                            try:
-                                import encryption  # NFR-06
-                                with open(ALERTS_FILE, "r") as f:
-                                    content = f.read().strip()
-                                if content:
-                                    try:
-                                        content = encryption.decrypt(content)
-                                    except Exception:
-                                        pass
-                                    current = json.loads(content)
-                            except (json.JSONDecodeError, ValueError):
-                                print("[AlertGenerator] alerts.json corrupt, resetting to clean state")
-                                current = []
+                    if os.path.exists(ALERTS_FILE):
+                        try:
+                            import encryption  # NFR-06
+                            with open(ALERTS_FILE, "r") as f:
+                                content = f.read().strip()
+                            if content:
+                                try:
+                                    content = encryption.decrypt(content)
+                                except Exception:
+                                    pass
+                                current = json.loads(content)
+                        except (json.JSONDecodeError, ValueError):
+                            print("[AlertGenerator] alerts.json corrupt, resetting to clean state")
+                            current = []
 
                     # Preserve ack status for any alerts acknowledged
                     # via the dashboard while we were running
