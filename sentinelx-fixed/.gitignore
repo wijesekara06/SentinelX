@@ -10,3 +10,5 @@ __pycache__/
 # Runtime data (optional but recommended for your project)
 honeypot/alerts.json
 backend/admin_audit.log
+cert.pem
+key.pem
