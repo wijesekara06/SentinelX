@@ -17,8 +17,8 @@ from colorama import Fore, Style, init
 
 init(autoreset=True)
 
-BASE_URL      = "http://localhost:5001"
-BACKEND_URL   = "http://localhost:5000"
+BASE_URL      = "https://localhost:5001"
+BACKEND_URL   = "https://localhost:5000"
 
 
 def section(title):
@@ -34,6 +34,7 @@ def get_auth_token():
             f"{BACKEND_URL}/api/auth/login",
             json={"username": "admin", "password": "SentinelX@2026"},
             timeout=5,
+            verify=False,
         )
         return r.json().get("token")
     except Exception:
@@ -44,9 +45,9 @@ def send(method, path, data=None, label=""):
     url = f"{BASE_URL}{path}"
     try:
         if method == "GET":
-            r = requests.get(url, params=data, timeout=5)
+            r = requests.get(url, params=data, timeout=5, verify=False)
         else:
-            r = requests.post(url, data=data, timeout=5)
+            r = requests.post(url, data=data, timeout=5, verify=False)
         color = Fore.GREEN if r.status_code in (200, 404) else Fore.YELLOW
         print(f"  {color}[{r.status_code}]{Style.RESET_ALL} {method} {path}  →  {label}")
     except Exception as e:
@@ -56,7 +57,7 @@ def send(method, path, data=None, label=""):
 def show_results(token=None):
     headers = {"Authorization": f"Bearer {token}"} if token else {}
     try:
-        r    = requests.get(f"{BACKEND_URL}/api/logs?limit=6", headers=headers, timeout=5)
+        r    = requests.get(f"{BACKEND_URL}/api/logs?limit=6", headers=headers, timeout=5, verify=False)
         logs = r.json().get("logs", [])
         print(f"\n  {Fore.YELLOW}Last {len(logs)} captured events:{Style.RESET_ALL}")
         for log in logs:
@@ -148,7 +149,7 @@ show_results(token)
 if token:
     headers = {"Authorization": f"Bearer {token}"}
     try:
-        r     = requests.get(f"{BACKEND_URL}/api/stats", headers=headers, timeout=5)
+        r     = requests.get(f"{BACKEND_URL}/api/stats", headers=headers, timeout=5, verify=False)
         stats = r.json()
         print(f"\n  Total events  : {stats['total_events']}")
         print(f"  Critical      : {stats['critical_count']}")
