@@ -215,10 +215,17 @@ def load_alerts():
     return []
 
 def save_alerts(alerts):
+    import fcntl
     import encryption  # NFR-06: AES-256 at rest
-    json_str = json.dumps(alerts, indent=2, default=str)
-    with open(ALERTS_FILE, "w") as f:
-        f.write(encryption.encrypt(json_str))
+    lock_path = ALERTS_FILE + ".lock"
+    with open(lock_path, "w") as lock_file:
+        fcntl.flock(lock_file.fileno(), fcntl.LOCK_EX)
+        try:
+            json_str = json.dumps(alerts, indent=2, default=str)
+            with open(ALERTS_FILE, "w") as f:
+                f.write(encryption.encrypt(json_str))
+        finally:
+            fcntl.flock(lock_file.fileno(), fcntl.LOCK_UN)
 
 
 # ── App factory ───────────────────────────────────────────────────────────────
@@ -252,8 +259,6 @@ def create_backend_app():
                 return jsonify({
                     "error": f"Rate limit exceeded. Retry after {retry} seconds."
                 }), 429
-
-    # ── Dashboard (public) ────────────────────────────────────────────────────
 
     # ── Dashboard (public) ────────────────────────────────────────────────────
 
@@ -866,8 +871,8 @@ def create_backend_app():
         return jsonify({
             "status":    "backend_active",
             "version":   "2.0.0",
-            "honeypot":  f"http://{host}:5001",
-            "dashboard": f"http://{host}:5000/dashboard",
+            "honeypot":  f"https://{host}:5001",
+            "dashboard": f"https://{host}:5000/dashboard",
         })
 
     return app

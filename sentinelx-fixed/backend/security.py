@@ -4,7 +4,8 @@ SentinelX - Security Utilities
 NFR-05 / NFR-06 supporting module.
 
 Contains four things:
-  1. HTTP Security Headers  - added to every response automatically
+  1. 
+HTTP Security Headers  - added to every response automatically
   2. Per-IP Rate Limiting   - stops brute-force abuse of any API endpoint
   3. JWT Token Blacklist    - makes logout actually work server-side
   4. Input Sanitization     - prevents log-injection via crafted usernames
@@ -35,8 +36,8 @@ _SECURITY_HEADERS = {
         "script-src 'self' 'unsafe-inline'; "
         "style-src 'self' 'unsafe-inline'; "
         "img-src 'self' data:; "
-        "connect-src 'self' http://localhost:5001 http://localhost:5000 "
-        "http://127.0.0.1:5001 http://127.0.0.1:5000;"
+        "connect-src 'self' https://localhost:5001 https://localhost:5000 "
+        "https://127.0.0.1:5001 https://127.0.0.1:5000;"
     ),
 }
 

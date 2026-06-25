@@ -25,8 +25,8 @@ from colorama import Fore, Style, init
 
 init(autoreset=True)
 
-HP_URL  = "http://localhost:5001"
-BE_URL  = "http://localhost:5000"
+HP_URL  = "https://localhost:5001"
+BE_URL  = "https://localhost:5000"
 
 
 def section(title):
@@ -45,7 +45,28 @@ def check(label, condition):
 def login(username, password):
     r = requests.post(f"{BE_URL}/api/auth/login",
                        json={"username": username, "password": password},
-                       timeout=5)
+                       timeout=5, verify=False)
+    data = r.json()
+
+    if data.get("mfa_required"):
+        import pyotp, json, os
+        mfa_store_path = os.path.join(
+            os.path.dirname(os.path.abspath(__file__)),
+            "../backend/.mfa_store.json"
+        )
+        try:
+            with open(mfa_store_path) as f:
+                store = json.load(f)
+            secret = store.get(username, {}).get("secret")
+            if secret:
+                code = pyotp.TOTP(secret).now()
+                r2 = requests.post(f"{BE_URL}/api/auth/mfa/verify",
+                                    json={"mfa_token": data["mfa_token"], "code": code},
+                                    timeout=5, verify=False)
+                return r2.json().get("token")
+        except Exception as e:
+            print(f"  [WARN] MFA auto-complete failed: {e}")
+        return None
     return r.json().get("token")
 
 
@@ -63,7 +84,7 @@ check("Analyst token obtained", bool(analyst_token))
 
 # ── 1. List existing honeypots ──────────────────────────────────────────
 section("TEST 1 — List Honeypots (FR-01)")
-r = requests.get(f"{BE_URL}/api/honeypots", headers=auth(admin_token), timeout=5)
+r = requests.get(f"{BE_URL}/api/honeypots", headers=auth(admin_token), timeout=5, verify=False)
 data = r.json()
 check("GET /api/honeypots returns 200", r.status_code == 200)
 check("Seeded honeypots present (>=8)", len(data.get("honeypots", [])) >= 8)
@@ -76,7 +97,7 @@ for hp in data.get("honeypots", []):
 section("TEST 2 — RBAC: Analyst cannot create honeypots")
 r = requests.post(f"{BE_URL}/api/honeypots", headers=auth(analyst_token),
                    json={"url": "/fake-test", "service_type": "test",
-                         "interaction_level": "active"}, timeout=5)
+                         "interaction_level": "active"}, timeout=5, verify=False)
 check("Analyst create -> 403 Forbidden", r.status_code == 403)
 
 
@@ -85,7 +106,7 @@ section("TEST 3 — Admin creates a new honeypot")
 r = requests.post(f"{BE_URL}/api/honeypots", headers=auth(admin_token),
                    json={"url": "/fake-test-endpoint",
                          "service_type": "test_service",
-                         "interaction_level": "active"}, timeout=5)
+                         "interaction_level": "active"}, timeout=5, verify=False)
 check("Create honeypot -> 201", r.status_code == 201)
 new_hp = r.json().get("honeypot", {})
 new_id = new_hp.get("id")
@@ -98,7 +119,7 @@ section("TEST 4 — UC-04 AF1: Duplicate URL conflict")
 r = requests.post(f"{BE_URL}/api/honeypots", headers=auth(admin_token),
                    json={"url": "/fake-test-endpoint",
                          "service_type": "test_service",
-                         "interaction_level": "active"}, timeout=5)
+                         "interaction_level": "active"}, timeout=5, verify=False)
 check("Duplicate URL -> 409 Conflict", r.status_code == 409)
 check('Error message mentions "already in use"',
       "already in use" in r.json().get("error", "").lower())
@@ -106,38 +127,38 @@ check('Error message mentions "already in use"',
 
 # ── 5. New honeypot is live on the honeypot server ──────────────────────
 section("TEST 5 — New honeypot is live (active)")
-r = requests.get(f"{HP_URL}/fake-test-endpoint", timeout=5)
+r = requests.get(f"{HP_URL}/fake-test-endpoint", timeout=5, verify=False)
 check("Active honeypot returns 200", r.status_code == 200)
 
 
 # ── 6. Disable the honeypot -> 404 on honeypot server ───────────────────
 section("TEST 6 — Disable honeypot -> 404")
 r = requests.post(f"{BE_URL}/api/honeypots/{new_id}/toggle",
-                   headers=auth(admin_token), timeout=5)
+                   headers=auth(admin_token), timeout=5, verify=False)
 check("Toggle -> 200", r.status_code == 200)
 check("Honeypot now disabled", r.json().get("honeypot", {}).get("enabled") is False)
 
-r = requests.get(f"{HP_URL}/fake-test-endpoint", timeout=5)
+r = requests.get(f"{HP_URL}/fake-test-endpoint", timeout=5, verify=False)
 check("Disabled honeypot returns 404", r.status_code == 404)
 
 
 # ── 7. Re-enable and set to passive ─────────────────────────────────────
 section("TEST 7 — Re-enable + set interaction_level=passive")
 r = requests.put(f"{BE_URL}/api/honeypots/{new_id}", headers=auth(admin_token),
-                  json={"enabled": True, "interaction_level": "passive"}, timeout=5)
+                  json={"enabled": True, "interaction_level": "passive"}, timeout=5, verify=False)
 check("Update -> 200", r.status_code == 200)
 hp = r.json().get("honeypot", {})
 check("Honeypot re-enabled", hp.get("enabled") is True)
 check("Interaction level = passive", hp.get("interaction_level") == "passive")
 
-r = requests.get(f"{HP_URL}/fake-test-endpoint", timeout=5)
+r = requests.get(f"{HP_URL}/fake-test-endpoint", timeout=5, verify=False)
 check("Passive honeypot returns 200", r.status_code == 200)
 check("Passive honeypot returns minimal (empty) body", r.text == "")
 
 
 # ── 8. Audit log recorded all changes ───────────────────────────────────
 section("TEST 8 — Audit log (UC-04 post-conditions)")
-r = requests.get(f"{BE_URL}/api/honeypots/audit", headers=auth(admin_token), timeout=5)
+r = requests.get(f"{BE_URL}/api/honeypots/audit", headers=auth(admin_token), timeout=5, verify=False)
 check("GET /api/honeypots/audit -> 200", r.status_code == 200)
 audit = r.json().get("audit", [])
 actions_for_new = [a["action"] for a in audit if a.get("honeypot_id") == new_id]
@@ -150,19 +171,19 @@ check("Audit entries record actor='admin'",
 
 # ── 9. Cleanup — delete test honeypot ───────────────────────────────────
 section("TEST 9 — Delete honeypot (cleanup)")
-r = requests.delete(f"{BE_URL}/api/honeypots/{new_id}", headers=auth(admin_token), timeout=5)
+r = requests.delete(f"{BE_URL}/api/honeypots/{new_id}", headers=auth(admin_token), timeout=5, verify=False)
 check("Delete -> 200", r.status_code == 200)
 
-r = requests.get(f"{HP_URL}/fake-test-endpoint", timeout=5)
+r = requests.get(f"{HP_URL}/fake-test-endpoint", timeout=5, verify=False)
 check("Deleted honeypot route falls through to catch-all (404)", r.status_code == 404)
 
 
 # ── 10. Analyst can read but not write ──────────────────────────────────
 section("TEST 10 — RBAC: Analyst read-only access")
-r = requests.get(f"{BE_URL}/api/honeypots", headers=auth(analyst_token), timeout=5)
+r = requests.get(f"{BE_URL}/api/honeypots", headers=auth(analyst_token), timeout=5, verify=False)
 check("Analyst GET /api/honeypots -> 200", r.status_code == 200)
 
-r = requests.delete(f"{BE_URL}/api/honeypots/hp-admin-login", headers=auth(analyst_token), timeout=5)
+r = requests.delete(f"{BE_URL}/api/honeypots/hp-admin-login", headers=auth(analyst_token), timeout=5, verify=False)
 check("Analyst DELETE -> 403 Forbidden", r.status_code == 403)
 
 print(f"\n{Fore.GREEN}  FR-01 / UC-04 test suite complete.{Style.RESET_ALL}\n")

@@ -115,7 +115,6 @@ class CVECorrelator:
                 return result
             else:
                 self._api_failed_at = time.time()
-	
         # Step 3 - Offline fallback
         offline = OFFLINE_CVE_MAP.get(
             attack_type,

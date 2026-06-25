@@ -204,7 +204,7 @@ body { background:var(--bg); color:var(--text); font-family:var(--sans); font-si
       </div>
       <div class="stat-card c-green">
         <div class="stat-label">Active Honey Nodes</div>
-        <div class="stat-value sv-green">6</div>
+        <div class="stat-value sv-green" id="s-honeypots">6</div>
         <div class="stat-sub">decoy endpoints active</div>
       </div>
       <div class="stat-card c-green">
@@ -222,17 +222,17 @@ body { background:var(--bg); color:var(--text); font-family:var(--sans); font-si
       <div class="stat-card c-red">
         <div class="stat-label">Critical Alerts</div>
         <div class="stat-value sv-red" id="s-crit">0</div>
-        <div class="stat-sub">risk score &gt; 4.5</div>
+        <div class="stat-sub">risk score &gt; 6.5</div>
       </div>
       <div class="stat-card c-orange">
         <div class="stat-label">Medium Alerts</div>
         <div class="stat-value sv-orange" id="s-med">0</div>
-        <div class="stat-sub">risk score &gt; 2.5</div>
+        <div class="stat-sub">risk score &gt; 3.5</div>
       </div>
       <div class="stat-card c-blue">
         <div class="stat-label">Low Risk Events</div>
         <div class="stat-value sv-blue" id="s-low">0</div>
-        <div class="stat-sub">risk score &le; 2.5</div>
+        <div class="stat-sub">risk score &le; 3.5</div>
       </div>
       <div class="stat-card c-purple">
         <div class="stat-label">Attack Categories</div>
@@ -625,6 +625,8 @@ async function loadHoneypots() {
       headers: { 'Authorization': `Bearer ${tok}` }
     });
     const d = await r.json();
+    document.getElementById('s-honeypots').textContent =
+      (data.honeypots || []).filter(h => h.enabled).length;
     const honeypots = d.honeypots || [];
     const list = document.getElementById('hp-list');
 

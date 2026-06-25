@@ -46,7 +46,15 @@ if __name__ == "__main__":
 ║    Reconnaissance      -> CVE-2017-9798  CVSS: 5.3       ║
 ╚══════════════════════════════════════════════════════════╝
 """)
-    print(f"  Running on : http://localhost:{port}")
-    print(f"  Health API : http://localhost:{port}/api/health\n")
+    import os
+    BASE_DIR  = os.path.dirname(os.path.abspath(__file__))
+    CERT_FILE = os.path.join(BASE_DIR, "cert.pem")
+    KEY_FILE  = os.path.join(BASE_DIR, "key.pem")
 
-    app.run(host="0.0.0.0", port=port, debug=False)
+    ssl_ctx = (CERT_FILE, KEY_FILE) if os.path.exists(CERT_FILE) else None
+    scheme  = "https" if ssl_ctx else "http"
+
+    print(f"  Running on : {scheme}://localhost:{port}")
+    print(f"  Health API : {scheme}://localhost:{port}/api/health\n")
+
+    app.run(host="0.0.0.0", port=port, debug=False, ssl_context=ssl_ctx)
