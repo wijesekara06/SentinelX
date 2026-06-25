@@ -11,7 +11,7 @@ Actual risk formula applied in code:
 
 Example — SQL Injection, freq=1, CVSS=9.8, persistence=0:
     norm_freq = min(2.0, 10) = 2.0
-    score = (2.0×0.4) + (9.8×0.4) + (0×0.2) = 0.8 + 3.92 + 0 = 4.72 → Critical
+    score = (2.0×0.4) + (9.8×0.4) + (0×0.2) = 0.8 + 3.92 + 0 = 4.72 → Medium
 
 FIX v2:
   - Removed python-requests / Go-http-client from RECON_PATTERNS (matched test suite UA)
