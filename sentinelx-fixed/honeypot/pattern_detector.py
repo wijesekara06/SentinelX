@@ -66,7 +66,6 @@ DIR_TRAVERSAL_PATTERNS = [
     r"(?i)(%2e%2e%2f)",
     r"(?i)(%252e%252e)",
     r"(?i)(\/proc\/self)",
-    r"(?i)(\/var\/log)",
 ]
 
 RECON_PATTERNS = [
