@@ -626,7 +626,7 @@ async function loadHoneypots() {
     });
     const d = await r.json();
     document.getElementById('s-honeypots').textContent =
-      (data.honeypots || []).filter(h => h.enabled).length;
+      (d.honeypots || []).filter(h => h.enabled).length;
     const honeypots = d.honeypots || [];
     const list = document.getElementById('hp-list');
 
