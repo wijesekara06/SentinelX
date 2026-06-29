@@ -1,0 +1,16 @@
+{
+  "SQL Injection": {
+    "cve_id": "CVE-2000-1233",
+    "cvss_score": 7.5,
+    "description": "SQL injection vulnerability in read.php3 and other scripts in Phorum 3.0.7 allows remote attackers to execute arbitrary SQL queries via the sSQL parameter.",
+    "severity": "UNKNOWN",
+    "source": "nvd_api"
+  },
+  "Directory Traversal": {
+    "cve_id": "CVE-1999-1177",
+    "cvss_score": 5.0,
+    "description": "Directory traversal vulnerability in nph-publish before 1.2 allows remote attackers to overwrite arbitrary files via a .. (dot dot) in the pathname for an upload operation.",
+    "severity": "UNKNOWN",
+    "source": "nvd_api"
+  }
+}

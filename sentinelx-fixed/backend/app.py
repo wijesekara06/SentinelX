@@ -548,23 +548,36 @@ def create_backend_app():
     @require_auth(roles=["admin", "analyst"])
     def get_stats():
         from collections import defaultdict
+        from datetime import datetime, timezone, timedelta
         all_logs         = read_logs(limit=10000)
         attack_breakdown = defaultdict(int)
         risk_breakdown   = defaultdict(int)
         ip_counts        = defaultdict(int)
+        cutoff           = datetime.now(timezone.utc) - timedelta(hours=24)
+        recent_24h       = 0
         for log in all_logs:
             attack_breakdown[log.get("attack_type", "Unknown")] += 1
             risk_breakdown[log.get("risk_label", "Low")]        += 1
             ip_counts[log.get("source_ip", "?")]                += 1
-        top_ips = dict(
-            sorted(ip_counts.items(), key=lambda x: x[1], reverse=True)[:10]
-        )
+            try:
+                ts = datetime.fromisoformat(log.get("timestamp", ""))
+                if ts.tzinfo is None:
+                    ts = ts.replace(tzinfo=timezone.utc)
+                if ts > cutoff:
+                    recent_24h += 1
+            except (ValueError, TypeError):
+                pass
+        top_ips = dict(sorted(ip_counts.items(), key=lambda x: x[1], reverse=True)[:10])
+        by_type = dict(attack_breakdown)
         return jsonify({
             "total_events":     len(all_logs),
+            "total_alerts":     len(all_logs),
             "critical_count":   risk_breakdown.get("Critical", 0),
             "medium_count":     risk_breakdown.get("Medium", 0),
             "low_count":        risk_breakdown.get("Low", 0),
-            "attack_breakdown": dict(attack_breakdown),
+            "attack_breakdown": by_type,
+            "by_type":          by_type,
+            "recent_24h":       recent_24h,
             "top_ips":          top_ips,
         })
 
@@ -709,7 +722,7 @@ def create_backend_app():
         action = request.args.get("action")
         return jsonify({
             "status": "ok",
-            "audit":  audit_logger.get_audit_log(limit=limit, actor=actor, action=action),
+            "entries":  audit_logger.get_audit_log(limit=limit, actor=actor, action=action),
         })
     @app.route("/api/honeypots/audit", methods=["GET"])
     @require_auth(roles=["admin"])

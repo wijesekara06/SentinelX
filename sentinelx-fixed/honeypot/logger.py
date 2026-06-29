@@ -74,6 +74,7 @@ class ActivityLogger:
             "source_ip":    source_ip,
             "timestamp":    timestamp,
             "http_method":  http_method,
+            "method":       http_method,
             "target_url":   target_url,
             "query_string": query_str,
             "headers": {

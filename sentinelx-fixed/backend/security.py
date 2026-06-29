@@ -94,7 +94,7 @@ class SlidingWindowRateLimiter:
 # Two separate limiters with different thresholds:
 # - Auth endpoints (login/logout): strict — 10 requests per minute
 # - All other API endpoints: relaxed — 120 requests per minute
-auth_limiter = SlidingWindowRateLimiter(max_requests=10,  window_seconds=60)
+auth_limiter = SlidingWindowRateLimiter(max_requests=30,  window_seconds=60)
 api_limiter  = SlidingWindowRateLimiter(max_requests=120, window_seconds=60)
 
 
