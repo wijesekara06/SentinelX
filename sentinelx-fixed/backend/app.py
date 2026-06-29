@@ -316,6 +316,25 @@ def create_backend_app():
         user = USERS.get(username)
 
         if not user:
+            _failed_attempts[username] += 1
+            attempts_left = LOCKOUT_THRESHOLD - _failed_attempts[username]
+
+            if _failed_attempts[username] >= LOCKOUT_THRESHOLD:
+                _lockout_until[username] = now + LOCKOUT_SECONDS
+                _failed_attempts[username] = 0
+
+                audit_logger.log_action(
+                    username,
+                    "login",
+                    ip=request.remote_addr,
+                    success=False,
+                    details={"reason": "lockout_triggered"}
+                )
+
+                return jsonify({
+                    "error": "Too many failed attempts. Account locked for 5 minutes."
+                }), 429
+
             audit_logger.log_action(
                 username,
                 "login",
@@ -325,7 +344,7 @@ def create_backend_app():
             )
 
             return jsonify({
-                "error": "Invalid credentials"
+                "error": f"Invalid credentials. {attempts_left} attempt(s) remaining."
             }), 401
 
         if not check_password_hash(user["password_hash"], password):
