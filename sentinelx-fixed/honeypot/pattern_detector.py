@@ -130,18 +130,18 @@ ATTACK_REGISTRY = [
         "cve_example": "CVE-2021-34429",
     },
     {
-        "name":        "Directory Traversal",
-        "patterns":    DIR_TRAVERSAL_PATTERNS,
-        "cve_hint":    "path traversal directory",
-        "base_cvss":   7.5,
-        "cve_example": "CVE-2021-41773",
-    },
-    {
         "name":        "Command Injection",
         "patterns":    COMMAND_INJECTION_PATTERNS,
         "cve_hint":    "command injection rce",
         "base_cvss":   9.8,
         "cve_example": "CVE-2021-42013",
+    },
+    {
+        "name":        "Directory Traversal",
+        "patterns":    DIR_TRAVERSAL_PATTERNS,
+        "cve_hint":    "path traversal directory",
+        "base_cvss":   7.5,
+        "cve_example": "CVE-2021-41773",
     },
     {
         "name":        "Reconnaissance",

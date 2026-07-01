@@ -24,6 +24,7 @@ import hmac
 import hashlib
 import base64
 import time
+import secrets
 from functools import wraps
 from collections import defaultdict
 from flask import Flask, request, jsonify, Response, send_from_directory
@@ -84,6 +85,7 @@ def create_token(username, role):
         "role": role,
         "iat":  int(time.time()),
         "exp":  int(time.time()) + JWT_EXPIRY,
+        "jti":  secrets.token_hex(8),
     }).encode())
     sig_input = f"{header}.{payload}".encode()
     sig = _b64(hmac.new(JWT_SECRET.encode(), sig_input, hashlib.sha256).digest())
@@ -127,6 +129,7 @@ def create_mfa_token(username, role):
         "iat":         int(time.time()),
         "exp":         int(time.time()) + 300,  # 5 minutes only
         "mfa_pending": True,
+        "jti":         secrets.token_hex(8),
     }).encode())
     sig_input = f"{header}.{payload}".encode()
     sig = _b64(hmac.new(JWT_SECRET.encode(), sig_input, hashlib.sha256).digest())
