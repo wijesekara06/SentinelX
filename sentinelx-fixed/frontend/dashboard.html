@@ -66,7 +66,7 @@ body { background:var(--bg); color:var(--text); font-family:var(--sans); font-si
 .content-grid { display:grid; grid-template-columns:1fr 1fr; gap:12px; margin-bottom:12px; }
 .card { background:var(--bg2); border:1px solid var(--border); border-radius:4px; overflow:hidden; }
 .card-header { padding:12px 16px; border-bottom:1px solid var(--border); display:flex; align-items:center; justify-content:space-between; background:var(--bg3); }
-.card-title { font-size:.7rem; font-family:var(--mono); color:var(--accent); text-transform:uppercase; letter-spacing:.1em; display:flex; align-items:center; gap:8px; }
+.card-title { font-size:.7rem; font-family:var(--mono); font-weight:400; color:var(--accent); text-transform:uppercase; letter-spacing:.1em; display:flex; align-items:center; gap:8px; }
 .card-title::before { content:'//'; color:var(--muted); }
 .card-body { padding:16px; }
 .refresh-btn { background:transparent; border:1px solid var(--border); color:var(--muted); padding:3px 10px; border-radius:2px; cursor:pointer; font-size:.7rem; font-family:var(--mono); transition:.15s; }
@@ -141,32 +141,32 @@ body { background:var(--bg); color:var(--text); font-family:var(--sans); font-si
 </head>
 <body>
 
-<div id="login-screen">
+<div id="login-screen" role="dialog" aria-modal="true" aria-label="SentinelX login">
   <div class="login-card">
     <div class="login-logo">
       <h1>SENTINELX</h1>
       <p>Command Center — Restricted Access Only</p>
     </div>
     <div class="login-warn">⚠ Unauthorized access is monitored and logged</div>
-    <label class="form-label">Badge ID / Email</label>
+    <label class="form-label" for="u">Badge ID / Email</label>
     <input class="form-input" type="text" id="u" placeholder="admin" />
-    <label class="form-label">Security Key</label>
+    <label class="form-label" for="p">Security Key</label>
     <input class="form-input" type="password" id="p" placeholder="••••••••••••" />
     <button class="btn-auth" onclick="doLogin()">Authenticate</button>
-    <div class="login-error" id="login-err"></div>
+    <div class="login-error" id="login-err" role="alert"></div>
   </div>
 </div>
-<div id="mfa-screen">
+<div id="mfa-screen" role="dialog" aria-modal="true" aria-labelledby="mfa-title">
   <div class="mfa-card">
     <div class="mfa-title">
-      <h2>MFA VERIFICATION</h2>
-      <p>Enter the 6-digit code from your authenticator app</p>
+      <h2 id="mfa-title">MFA VERIFICATION</h2>
+      <p id="mfa-desc">Enter the 6-digit code from your authenticator app</p>
     </div>
     <input class="mfa-code-input" type="text" id="mfa-code"
            inputmode="numeric" maxlength="8" placeholder="000000"
-           autocomplete="one-time-code" />
+           autocomplete="one-time-code" aria-describedby="mfa-desc" />
     <button class="btn-auth" onclick="doMfaVerify()">Verify</button>
-    <div class="login-error" id="mfa-err"></div>
+    <div class="login-error" id="mfa-err" role="alert"></div>
     <div style="text-align:center;margin-top:14px;font-size:.72rem;color:var(--muted);font-family:var(--mono);">
       Lost your phone? Enter a backup code instead.
     </div>
@@ -174,7 +174,7 @@ body { background:var(--bg); color:var(--text); font-family:var(--sans); font-si
 </div>
 
 <div id="app">
-  <div class="topbar">
+  <header class="topbar">
     <div class="topbar-left">
       <div class="topbar-logo">SENTINELX</div>
       <div class="topbar-tag">COMMAND CENTER</div>
@@ -187,8 +187,8 @@ body { background:var(--bg); color:var(--text); font-family:var(--sans); font-si
       <button class="btn-export" id="btn-pdf" onclick="downloadReport('pdf')">[ PDF ]</button>
       <button class="btn-logout" onclick="doLogout()">[ LOGOUT ]</button>
     </div>
-  </div>
-  <div class="main">
+  </header>
+  <main class="main">
     <div class="status-bar">
       <div class="status-item">HONEYPOT <span class="ok">● ACTIVE</span></div>
       <div class="status-item">CVE ENGINE <span class="ok">● READY</span></div>
@@ -243,7 +243,7 @@ body { background:var(--bg); color:var(--text); font-family:var(--sans); font-si
     <div class="content-grid">
       <div class="card">
         <div class="card-header">
-          <div class="card-title">Attack Vector Analysis</div>
+          <h2 class="card-title">Attack Vector Analysis</h2>
           <button class="refresh-btn" onclick="loadStats()">&#8635; Refresh</button>
         </div>
         <div class="card-body">
@@ -252,29 +252,29 @@ body { background:var(--bg); color:var(--text); font-family:var(--sans); font-si
       </div>
       <div class="card">
         <div class="card-header">
-          <div class="card-title">Live Threat Feed</div>
+          <h2 class="card-title">Live Threat Feed</h2>
           <div style="display:flex;align-items:center;gap:10px">
             <div class="rec-dot" id="rec-ind" style="display:none">RECORDING</div>
             <button class="refresh-btn" onclick="loadLogs()">&#8635; Refresh</button>
           </div>
         </div>
         <div class="card-body" style="padding:8px 16px">
-          <div id="feed"><div class="empty-state">// no threats detected yet...</div></div>
+          <div id="feed" aria-live="polite"><div class="empty-state">// no threats detected yet...</div></div>
         </div>
       </div>
     </div>
     <div class="card" style="margin-bottom:12px">
       <div class="card-header">
-        <div class="card-title">Active Alerts</div>
+        <h2 class="card-title">Active Alerts</h2>
         <button class="refresh-btn" onclick="loadAlerts()">&#8635; Refresh</button>
       </div>
       <div class="card-body">
-        <div id="alerts-panel"><div class="empty-state">// no critical alerts</div></div>
+        <div id="alerts-panel" aria-live="polite"><div class="empty-state">// no critical alerts</div></div>
       </div>
     </div>
     <div class="card" style="margin-bottom:12px">
       <div class="card-header">
-        <div class="card-title">Honeypot Configuration</div>
+        <h2 class="card-title">Honeypot Configuration</h2>
         <div style="display:flex;align-items:center;gap:10px">
           <button class="refresh-btn" onclick="toggleHpForm()">+ Add Honeypot</button>
           <button class="refresh-btn" onclick="loadHoneypots()">&#8635; Refresh</button>
@@ -282,16 +282,16 @@ body { background:var(--bg); color:var(--text); font-family:var(--sans); font-si
       </div>
       <div class="card-body">
         <div id="hp-form" style="display:none;margin-bottom:14px;padding:12px;background:var(--bg3);border:1px solid var(--border);border-radius:3px">
-          <label class="form-label">Endpoint URL</label>
+          <label class="form-label" for="hp-url">Endpoint URL</label>
           <input class="form-input" type="text" id="hp-url" placeholder="/fake-endpoint" />
-          <label class="form-label">Service Type</label>
+          <label class="form-label" for="hp-service">Service Type</label>
           <input class="form-input" type="text" id="hp-service" placeholder="login_panel, api_endpoint, etc." />
-          <label class="form-label">Interaction Level</label>
+          <label class="form-label" for="hp-level">Interaction Level</label>
           <select class="form-input" id="hp-level">
             <option value="active">active — log + return full decoy response</option>
             <option value="passive">passive — log only, minimal response</option>
           </select>
-          <div id="hp-form-err" class="login-error" style="margin-bottom:10px"></div>
+          <div id="hp-form-err" class="login-error" style="margin-bottom:10px" role="alert"></div>
           <button class="btn-auth" style="width:auto;padding:8px 20px" onclick="createHoneypot()">Deploy Honeypot</button>
         </div>
         <div id="hp-list"><div class="empty-state">// loading honeypot configuration...</div></div>
@@ -300,7 +300,7 @@ body { background:var(--bg); color:var(--text); font-family:var(--sans); font-si
     </div>
     <div class="card">
       <div class="card-header">
-        <div class="card-title">Live Session Trace Log</div>
+        <h2 class="card-title">Live Session Trace Log</h2>
         <div class="rec-dot">RECORDING</div>
       </div>
       <div class="card-body" style="padding:10px 16px">
@@ -310,7 +310,7 @@ body { background:var(--bg); color:var(--text); font-family:var(--sans); font-si
         </div>
       </div>
     </div>
-  </div>
+  </main>
 </div>
 
 <script>
@@ -580,7 +580,7 @@ async function loadAlerts() {
           </span>
           ${acked
             ? `<span style="font-size:.65rem;color:var(--muted);margin-left:auto">✓ acknowledged</span>`
-            : `<button onclick="ackAlert('${a.id}')"
+            : `<button onclick="ackAlert('${a.id}')" aria-label="Acknowledge alert ${a.id}"
                 style="margin-left:auto;font-size:.65rem;padding:2px 8px;border-radius:3px;
                        border:1px solid var(--border);background:transparent;
                        color:var(--muted);cursor:pointer">ACK</button>`
@@ -659,10 +659,10 @@ async function loadHoneypots() {
               </td>
               <td>
                 <div class="hp-actions">
-                  <button class="hp-btn" onclick="toggleHoneypot('${hp.id}')">
+                  <button class="hp-btn" onclick="toggleHoneypot('${hp.id}')" aria-label="${hp.enabled ? 'Disable' : 'Enable'} honeypot ${hp.url}">
                     ${hp.enabled ? 'Disable' : 'Enable'}
                   </button>
-                  <button class="hp-btn danger" onclick="deleteHoneypot('${hp.id}','${hp.url}')">Delete</button>
+                  <button class="hp-btn danger" onclick="deleteHoneypot('${hp.id}','${hp.url}')" aria-label="Delete honeypot ${hp.url}">Delete</button>
                 </div>
               </td>
             </tr>`).join('')}

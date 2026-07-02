@@ -575,12 +575,14 @@ def create_backend_app():
         attack_breakdown = defaultdict(int)
         risk_breakdown   = defaultdict(int)
         ip_counts        = defaultdict(int)
+        url_counts       = defaultdict(int)
         cutoff           = datetime.now(timezone.utc) - timedelta(hours=24)
         recent_24h       = 0
         for log in all_logs:
             attack_breakdown[log.get("attack_type", "Unknown")] += 1
             risk_breakdown[log.get("risk_label", "Low")]        += 1
             ip_counts[log.get("source_ip", "?")]                += 1
+            url_counts[log.get("target_url", "?")]              += 1
             try:
                 ts = datetime.fromisoformat(log.get("timestamp", ""))
                 if ts.tzinfo is None:
@@ -590,6 +592,7 @@ def create_backend_app():
             except (ValueError, TypeError):
                 pass
         top_ips = dict(sorted(ip_counts.items(), key=lambda x: x[1], reverse=True)[:10])
+        top_urls = dict(sorted(url_counts.items(), key=lambda x: x[1], reverse=True)[:10])
         by_type = dict(attack_breakdown)
         return jsonify({
             "total_events":     len(all_logs),
@@ -601,6 +604,7 @@ def create_backend_app():
             "by_type":          by_type,
             "recent_24h":       recent_24h,
             "top_ips":          top_ips,
+            "top_urls":         top_urls,
         })
 
     # ── Alerts — requires auth ────────────────────────────────────────────────
