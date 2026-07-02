@@ -576,8 +576,19 @@ def create_backend_app():
         risk_breakdown   = defaultdict(int)
         ip_counts        = defaultdict(int)
         url_counts       = defaultdict(int)
-        cutoff           = datetime.now(timezone.utc) - timedelta(hours=24)
+        now              = datetime.now(timezone.utc)
+        cutoff           = now - timedelta(hours=24)
         recent_24h       = 0
+
+        # Pre-build 24 hourly buckets, oldest first, so the trend line has a
+        # continuous timeline even for hours with zero activity.
+        hourly_buckets = {}
+        bucket_order   = []
+        for i in range(23, -1, -1):
+            label = (now - timedelta(hours=i)).strftime("%H:00")
+            hourly_buckets[label] = 0
+            bucket_order.append(label)
+
         for log in all_logs:
             attack_breakdown[log.get("attack_type", "Unknown")] += 1
             risk_breakdown[log.get("risk_label", "Low")]        += 1
@@ -589,11 +600,15 @@ def create_backend_app():
                     ts = ts.replace(tzinfo=timezone.utc)
                 if ts > cutoff:
                     recent_24h += 1
+                    label = ts.strftime("%H:00")
+                    if label in hourly_buckets:
+                        hourly_buckets[label] += 1
             except (ValueError, TypeError):
                 pass
         top_ips = dict(sorted(ip_counts.items(), key=lambda x: x[1], reverse=True)[:10])
         top_urls = dict(sorted(url_counts.items(), key=lambda x: x[1], reverse=True)[:10])
         by_type = dict(attack_breakdown)
+        hourly_trend = [{"hour": h, "count": hourly_buckets[h]} for h in bucket_order]
         return jsonify({
             "total_events":     len(all_logs),
             "total_alerts":     len(all_logs),
@@ -605,6 +620,7 @@ def create_backend_app():
             "recent_24h":       recent_24h,
             "top_ips":          top_ips,
             "top_urls":         top_urls,
+            "hourly_trend":     hourly_trend,
         })
 
     # ── Alerts — requires auth ────────────────────────────────────────────────

@@ -78,6 +78,11 @@ body { background:var(--bg); color:var(--text); font-family:var(--sans); font-si
 .bf-red{background:var(--red)} .bf-orange{background:var(--orange)} .bf-yellow{background:var(--yellow)}
 .bf-green{background:var(--green)} .bf-purple{background:var(--purple)} .bf-teal{background:var(--teal)}
 .bar-count { font-size:.72rem; font-family:var(--mono); color:var(--text); width:24px; text-align:right; }
+.trend-chart { display:flex; align-items:flex-end; gap:3px; height:110px; padding:10px 4px 0; }
+.trend-bar-wrap { flex:1; display:flex; flex-direction:column; align-items:center; justify-content:flex-end; height:100%; }
+.trend-bar { width:100%; background:var(--accent2); border-radius:2px 2px 0 0; min-height:2px; transition:height .3s ease; }
+.trend-bar.has-activity:hover { background:var(--accent); }
+.trend-hour { font-size:.55rem; font-family:var(--mono); color:var(--muted); margin-top:4px; white-space:nowrap; }
 .threat-item { display:flex; align-items:flex-start; gap:10px; padding:8px 0; border-bottom:1px solid var(--border); }
 .threat-item:last-child { border-bottom:none; }
 #feed {max-height: 320px;overflow-y: auto;padding-right: 4px;}
@@ -265,6 +270,15 @@ body { background:var(--bg); color:var(--text); font-family:var(--sans); font-si
     </div>
     <div class="card" style="margin-bottom:12px">
       <div class="card-header">
+        <h2 class="card-title">Attack Trend — Last 24h</h2>
+        <button class="refresh-btn" onclick="loadStats()">&#8635; Refresh</button>
+      </div>
+      <div class="card-body">
+        <div id="trend" class="trend-chart"></div>
+      </div>
+    </div>
+    <div class="card" style="margin-bottom:12px">
+      <div class="card-header">
         <h2 class="card-title">Active Alerts</h2>
         <button class="refresh-btn" onclick="loadAlerts()">&#8635; Refresh</button>
       </div>
@@ -440,7 +454,28 @@ async function loadStats() {
     document.getElementById('s-types').textContent =
       Object.keys(bd).filter(k=>bd[k]>0).length;
     renderChart(bd);
+    renderTrend(d.hourly_trend||[]);
   } catch(e) {}
+}
+
+function renderTrend(hourly) {
+  const div = document.getElementById('trend');
+  if (!hourly.length) {
+    div.innerHTML = '<div class="empty-state">// no trend data yet...</div>';
+    return;
+  }
+  const max = Math.max(...hourly.map(h => h.count), 1);
+  div.innerHTML = hourly.map((h, i) => {
+    const pct        = (h.count / max * 100).toFixed(1);
+    const active      = h.count > 0 ? ' has-activity' : '';
+    const showLabel   = i % 3 === 0;
+    return `
+    <div class="trend-bar-wrap">
+      <div class="trend-bar${active}" style="height:${pct}%"
+           title="${h.hour} — ${h.count} event${h.count===1?'':'s'}"></div>
+      <div class="trend-hour">${showLabel ? h.hour : ''}</div>
+    </div>`;
+  }).join('');
 }
 
 function renderChart(bd) {
