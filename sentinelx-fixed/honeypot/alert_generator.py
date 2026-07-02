@@ -17,6 +17,7 @@ import threading
 import fcntl
 from datetime import datetime, timezone
 from . import email_notifier
+from . import sms_notifier
 
 ALERT_THRESHOLD = 3.5   # fire alert for anything labeled Medium or Critical
 ALERTS_FILE     = os.path.join(os.path.dirname(__file__), "alerts.json")
@@ -63,6 +64,13 @@ class AlertGenerator:
             daemon=True
         ).start()
 
+        if risk_label == "Critical":
+            threading.Thread(
+                target=self._send_sms_and_record,
+                args=(alert,),
+                daemon=True
+            ).start()
+
         return alert
 
     def _send_email_and_record(self, alert):
@@ -78,6 +86,21 @@ class AlertGenerator:
                 if a["id"] == alert["id"]:
                     if "email" not in a["channel"]:
                         a["channel"].append("email")
+                    break
+            self._save_alerts()
+
+    def _send_sms_and_record(self, alert):
+        """
+        Sends the alert SMS on a background thread — same reasoning as
+        _send_email_and_record: NFR-01's latency budget must not be spent
+        waiting on a Twilio API call. Only called for Critical alerts;
+        see sms_notifier.py for why.
+        """
+        if sms_notifier.send_alert_sms(alert):
+            for a in self._alerts:
+                if a["id"] == alert["id"]:
+                    if "sms" not in a["channel"]:
+                        a["channel"].append("sms")
                     break
             self._save_alerts()
 
